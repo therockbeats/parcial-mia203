@@ -21,9 +21,10 @@ Funcionamiento
 5. Combinar cláusulas: si alguna es POSITIVO -> POSITIVO; si no, INCIERTO; si no, NEGATIVO;
    si el hallazgo nunca aparece -> NO MENCIONADO.
 
-Reglas de gravedad (versión 2, a partir del análisis de errores en los dorados de desarrollo):
+Reglas de gravedad (versiones 2 y 3, a partir del análisis de errores en los dorados de desarrollo):
    * Ligamentos: esguince grado 1, señal intersticial o degeneración mucoide sin rotura -> NEGATIVO.
-   * Meniscos: degeneración o señal grado 1-2 (Stoller) sin rotura explícita -> NEGATIVO.
+   * Meniscos: degeneración o señal grado 1-2 (Stoller) sin rotura explícita -> INCIERTO
+     (versión 3: en la v2 era NEGATIVO y empeoró el acuerdo en la partición de reserva).
    * Artrosis: positiva si se declara explícitamente (OA, artrosis, pinzamiento); la condropatía
      o los osteofitos aislados solo cuentan si el grado es alto (grado 3-4, espesor total).
    * Derrame: escaso, leve o mínimo sin calificativo de moderado/abundante -> NEGATIVO.
@@ -259,7 +260,9 @@ def extract_labels(report: str, evidence: dict[str, list[str]] | None = None) ->
         # --- meniscos (lado medial / lateral) ---
         if ANATOMY["meniscus"].search(clause):
             if (DEGENERATION.search(clause) or MENISCAL_LOW_GRADE.search(clause)) and not TEAR.search(clause):
-                st = NEG                           # degeneración / señal grado 1-2: no es rotura
+                # Degeneración o señal grado 1-2 sin rotura: el hallazgo objetivo es "daño" meniscal,
+                # no solo rotura, por lo que se considera incierto (peso 0 en el entrenamiento).
+                st = NEG if NEGATION.search(PSEUDO_NEGATION.sub(" ", clause)) else UNC
             elif lesion:
                 st = clause_status(clause, True)
             else:
