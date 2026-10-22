@@ -175,9 +175,15 @@ def combine(statuses: list[int]) -> int:
     return NM
 
 
-def extract_labels(report: str) -> dict[str, int]:
-    """Aplica todas las reglas a un reporte y devuelve {hallazgo: código}."""
+def extract_labels(report: str, evidence: dict[str, list[str]] | None = None) -> dict[str, int]:
+    """
+    Aplica todas las reglas a un reporte y devuelve {hallazgo: código}.
+
+    Si se pasa un diccionario `evidence`, se completa con las cláusulas que originaron cada
+    decisión, en el formato "<estado>: <cláusula>" (análisis de errores).
+    """
     found: dict[str, list[int]] = {k: [] for k in LABELS}
+    n_prev = {k: 0 for k in LABELS}
     for clause in split_clauses(normalize(report)):
         lesion = bool(LESION.search(clause))
         # --- ligamentos ---
@@ -231,6 +237,11 @@ def extract_labels(report: str) -> dict[str, int]:
                     found[lab].append(NEG)
                 else:
                     found[lab].append(clause_status(clause))
+        if evidence is not None:
+            for k in LABELS:
+                for st in found[k][n_prev[k]:]:
+                    evidence.setdefault(k, []).append(f"{STATUS_NAME[st]}: {clause}")
+                n_prev[k] = len(found[k])
     return {k: combine(v) for k, v in found.items()}
 
 

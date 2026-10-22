@@ -92,6 +92,9 @@ labels:
   weight_uncertain: 0.0      # "posible", "no se descarta"... (0 = ignorar)
   weight_unmentioned: 0.5
   uncertain_as: 1            # si weight_uncertain > 0, valor objetivo para inciertos
+  # Fracción de los estudios dorados usada para el análisis de errores de las reglas
+  # (desarrollo); el resto (reserva) solo se usa para medir el acuerdo de cada versión.
+  gold_dev_fraction: 0.5
 
 # ---------------------------------------------------------------------
 # 4. Extracción de etiquetas con LLM local (paso 4, opcional)
