@@ -1,0 +1,15 @@
+{
+  "exp": "B_resnet50_bce",
+  "backbone": "resnet50",
+  "loss": "bce",
+  "labels_source": "rules",
+  "unmentioned_policy": "negative",
+  "gold_macro_auc": 0.7302777938044325,
+  "gold_macro_auc_ic95": [
+    0.6818637056830155,
+    0.7748116413144956
+  ],
+  "gold_macro_f1": 0.558242636617447,
+  "val_macro_auc": 0.752154895950239,
+  "n_gold": 58
+}

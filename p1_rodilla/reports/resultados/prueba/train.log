@@ -1,0 +1,5 @@
+15:40:56 | INFO | Experimento prueba | dispositivo cuda
+15:40:56 | INFO | Train: 24 estudios | Val: 12 estudios
+15:40:59 | INFO | Modelo: resnet50 (preentrenado=True) | parámetros entrenables: 24,057,293
+15:41:23 | INFO | época 01 | pérdida 1.0701 | AUC val 0.3665 | 24.0 s
+15:41:23 | INFO | Mejor AUC macro en validación: 0.3665. Pesos en D:\MIA203\runs\p1\prueba\best.pt
