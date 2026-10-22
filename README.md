@@ -135,15 +135,11 @@ efectiva junto a sus resultados.
 └── tests/                   datos sintéticos y prueba de extremo a extremo
 ```
 
-## Hardware utilizado
-Entrenamiento: AMD Threadripper PRO 9955WX, 2× NVIDIA RTX 5090 (32 GB), 64 GB RAM, Windows 11.
-Desarrollo: MacBook Pro M2 Max, 96 GB.
-
 ## Integrantes
 
 | Nombre | Código | Responsabilidad principal |
 |---|---|---|
-| (completar) | | |
+| Jose Miguel Alvarado Moreno | 20266834E | P1: Pipeline de datos, arquitectura 2.5D y entrenamiento GPU |
 | (completar) | | |
 | (completar) | | |
 | (completar) | | |
