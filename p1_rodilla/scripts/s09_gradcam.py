@@ -72,7 +72,7 @@ def main() -> None:
             s = int(np.argmax(att)) if att is not None else int(np.argmax(cams.reshape(len(cams), -1).sum(1)))
             img = x[0, s, 1].detach().cpu().numpy()          # canal central del triplete
             axes[row, 0].imshow(img, cmap="gray")
-            axes[row, 0].set_title(f"{gold.study_id[i]} | corte {s}", fontsize=9)
+            axes[row, 0].set_title(f"…{gold.study_id[i][-8:]} | corte {s}", fontsize=9)
             axes[row, 1].imshow(overlay(img, cams[s]))
             axes[row, 1].set_title(f"Grad-CAM {finding} | p={prob:.2f}", fontsize=9)
             for a in axes[row]:

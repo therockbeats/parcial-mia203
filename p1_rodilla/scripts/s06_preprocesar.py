@@ -82,7 +82,7 @@ def main() -> None:
         for ax, i in zip(axes.ravel(), pick):
             v = np.load(files[i])
             ax.imshow(v[v.shape[0] // 2], cmap="gray")
-            ax.set_title(files[i].stem.split("__")[0], fontsize=8)
+            ax.set_title("…" + files[i].stem.split("__")[0][-8:], fontsize=8)
         for ax in axes.ravel():
             ax.axis("off")
         fig.suptitle("Control de calidad: corte central de volúmenes preprocesados")
