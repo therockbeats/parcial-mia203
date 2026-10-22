@@ -1,0 +1,13 @@
+,gold,train,val,descripcion
+acl,24,63,23,positivos por hallazgo
+mcl,9,34,14,positivos por hallazgo
+medial_meniscus,26,143,35,positivos por hallazgo
+lateral_meniscus,23,60,17,positivos por hallazgo
+medial_oa,15,70,18,positivos por hallazgo
+lateral_oa,11,48,16,positivos por hallazgo
+pf_oa,21,72,19,positivos por hallazgo
+effusion,35,117,29,positivos por hallazgo
+synovitis,27,50,15,positivos por hallazgo
+baker_cyst,12,88,25,positivos por hallazgo
+bone_contusion,19,39,16,positivos por hallazgo
+fracture,18,28,14,positivos por hallazgo
