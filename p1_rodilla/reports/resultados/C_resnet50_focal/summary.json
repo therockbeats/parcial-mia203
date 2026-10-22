@@ -1,0 +1,15 @@
+{
+  "exp": "C_resnet50_focal",
+  "backbone": "resnet50",
+  "loss": "focal",
+  "labels_source": "rules",
+  "unmentioned_policy": "negative",
+  "gold_macro_auc": 0.705745395073541,
+  "gold_macro_auc_ic95": [
+    0.6619613858244656,
+    0.7510273409910945
+  ],
+  "gold_macro_f1": 0.5370230378040575,
+  "val_macro_auc": 0.7352829619967385,
+  "n_gold": 58
+}

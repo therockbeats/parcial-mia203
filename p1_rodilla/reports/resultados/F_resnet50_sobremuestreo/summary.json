@@ -1,0 +1,15 @@
+{
+  "exp": "F_resnet50_sobremuestreo",
+  "backbone": "resnet50",
+  "loss": "bce",
+  "labels_source": "rules",
+  "unmentioned_policy": "negative",
+  "gold_macro_auc": 0.7023573505238138,
+  "gold_macro_auc_ic95": [
+    0.6506316776849845,
+    0.7481139360081069
+  ],
+  "gold_macro_f1": 0.53801042866497,
+  "val_macro_auc": 0.722064313469208,
+  "n_gold": 58
+}

@@ -1,0 +1,15 @@
+{
+  "exp": "E_resnet50_ignorar_no_mencionados",
+  "backbone": "resnet50",
+  "loss": "bce",
+  "labels_source": "rules",
+  "unmentioned_policy": "ignore",
+  "gold_macro_auc": 0.715517543371973,
+  "gold_macro_auc_ic95": [
+    0.6618978610355181,
+    0.7671740513374437
+  ],
+  "gold_macro_f1": 0.5436113188834918,
+  "val_macro_auc": 0.7896270384803649,
+  "n_gold": 58
+}

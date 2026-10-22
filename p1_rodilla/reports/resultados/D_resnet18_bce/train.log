@@ -1,0 +1,24 @@
+17:17:38 | INFO | Experimento D_resnet18_bce | dispositivo cuda
+17:17:38 | INFO | Train: 425 estudios | Val: 75 estudios
+17:17:40 | INFO | Modelo: resnet18 (preentrenado=True) | parámetros entrenables: 11,314,125
+17:18:24 | INFO | época 01 | pérdida 1.3038 | AUC val 0.6107 | 43.5 s
+17:18:28 | INFO | época 02 | pérdida 1.2241 | AUC val 0.6112 | 4.2 s
+17:18:32 | INFO | época 03 | pérdida 1.1670 | AUC val 0.6615 | 4.0 s
+17:18:36 | INFO | época 04 | pérdida 1.0870 | AUC val 0.6495 | 4.1 s
+17:18:40 | INFO | época 05 | pérdida 1.0249 | AUC val 0.6894 | 4.0 s
+17:18:45 | INFO | época 06 | pérdida 0.9831 | AUC val 0.6564 | 4.1 s
+17:18:49 | INFO | época 07 | pérdida 0.9409 | AUC val 0.7001 | 4.1 s
+17:18:53 | INFO | época 08 | pérdida 0.8481 | AUC val 0.7134 | 4.0 s
+17:18:57 | INFO | época 09 | pérdida 0.7500 | AUC val 0.7287 | 4.0 s
+17:19:01 | INFO | época 10 | pérdida 0.7101 | AUC val 0.7360 | 4.1 s
+17:19:05 | INFO | época 11 | pérdida 0.6604 | AUC val 0.7294 | 4.2 s
+17:19:09 | INFO | época 12 | pérdida 0.5903 | AUC val 0.7254 | 4.1 s
+17:19:14 | INFO | época 13 | pérdida 0.4797 | AUC val 0.7425 | 4.2 s
+17:19:18 | INFO | época 14 | pérdida 0.4249 | AUC val 0.7350 | 4.1 s
+17:19:22 | INFO | época 15 | pérdida 0.3777 | AUC val 0.7334 | 4.1 s
+17:19:26 | INFO | época 16 | pérdida 0.3450 | AUC val 0.7382 | 4.0 s
+17:19:30 | INFO | época 17 | pérdida 0.2885 | AUC val 0.7334 | 4.2 s
+17:19:34 | INFO | época 18 | pérdida 0.2214 | AUC val 0.7297 | 4.1 s
+17:19:38 | INFO | época 19 | pérdida 0.1889 | AUC val 0.7302 | 4.1 s
+17:19:38 | INFO | Early stopping: 6 épocas sin mejorar
+17:19:38 | INFO | Mejor AUC macro en validación: 0.7425. Pesos en D:\MIA203\runs\p1\D_resnet18_bce\best.pt

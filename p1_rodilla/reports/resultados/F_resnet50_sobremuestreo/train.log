@@ -1,0 +1,22 @@
+17:24:04 | INFO | Experimento F_resnet50_sobremuestreo | dispositivo cuda
+17:24:04 | INFO | Train: 425 estudios | Val: 75 estudios
+17:24:05 | INFO | Modelo: resnet50 (preentrenado=True) | parámetros entrenables: 24,057,293
+17:24:51 | INFO | época 01 | pérdida 1.4563 | AUC val 0.6456 | 46.5 s
+17:24:58 | INFO | época 02 | pérdida 1.3240 | AUC val 0.6144 | 6.7 s
+17:25:05 | INFO | época 03 | pérdida 1.2146 | AUC val 0.6479 | 6.8 s
+17:25:12 | INFO | época 04 | pérdida 1.0929 | AUC val 0.6963 | 6.7 s
+17:25:18 | INFO | época 05 | pérdida 1.0067 | AUC val 0.6898 | 6.6 s
+17:25:25 | INFO | época 06 | pérdida 0.8844 | AUC val 0.6956 | 6.7 s
+17:25:32 | INFO | época 07 | pérdida 0.8734 | AUC val 0.7085 | 6.8 s
+17:25:39 | INFO | época 08 | pérdida 0.7633 | AUC val 0.7169 | 6.8 s
+17:25:46 | INFO | época 09 | pérdida 0.6545 | AUC val 0.6853 | 6.7 s
+17:25:52 | INFO | época 10 | pérdida 0.5499 | AUC val 0.7093 | 6.8 s
+17:25:59 | INFO | época 11 | pérdida 0.5110 | AUC val 0.7221 | 6.9 s
+17:26:06 | INFO | época 12 | pérdida 0.4573 | AUC val 0.7191 | 6.6 s
+17:26:13 | INFO | época 13 | pérdida 0.3586 | AUC val 0.7195 | 6.8 s
+17:26:20 | INFO | época 14 | pérdida 0.3141 | AUC val 0.6976 | 6.8 s
+17:26:26 | INFO | época 15 | pérdida 0.2805 | AUC val 0.7166 | 6.7 s
+17:26:33 | INFO | época 16 | pérdida 0.2261 | AUC val 0.7140 | 7.0 s
+17:26:40 | INFO | época 17 | pérdida 0.1656 | AUC val 0.7139 | 6.7 s
+17:26:40 | INFO | Early stopping: 6 épocas sin mejorar
+17:26:40 | INFO | Mejor AUC macro en validación: 0.7221. Pesos en D:\MIA203\runs\p1\F_resnet50_sobremuestreo\best.pt

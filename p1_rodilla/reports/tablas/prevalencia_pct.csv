@@ -1,0 +1,13 @@
+,% positivos gold,% positivos train,% positivos val
+acl,41.4,14.8,30.7
+mcl,15.5,8.0,18.7
+medial_meniscus,44.8,33.6,46.7
+lateral_meniscus,39.7,14.1,22.7
+medial_oa,25.9,16.5,24.0
+lateral_oa,19.0,11.3,21.3
+pf_oa,36.2,16.9,25.3
+effusion,60.3,27.5,38.7
+synovitis,46.6,11.8,20.0
+baker_cyst,20.7,20.7,33.3
+bone_contusion,32.8,9.2,21.3
+fracture,31.0,6.6,18.7

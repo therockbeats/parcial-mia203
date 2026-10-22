@@ -17,3 +17,22 @@ lateral_meniscus 58         23 0.735 0.634    0.16      0.545   0.783 0.643
            MACRO 58        240 0.730 0.642     NaN      0.500   0.701 0.558
 15:57:44 | INFO | AUC macro dorado = 0.7303  (IC95 % bootstrap: 0.682 a 0.775)
 15:57:44 | INFO | Resultados en D:\MIA203\runs\p1\B_resnet50_bce
+17:12:58 | INFO | Pesos de la época 12 (AUC val 0.7522)
+17:13:32 | INFO | 
+Métricas en el conjunto dorado:
+        hallazgo  n  positivos   auc    ap  umbral  precision  recall    f1
+             acl 58         24 0.767 0.739    0.27      0.613   0.792 0.691
+             mcl 58          9 0.527 0.231    0.13      0.240   0.667 0.353
+ medial_meniscus 58         26 0.761 0.793    0.13      0.469   0.885 0.613
+lateral_meniscus 58         23 0.735 0.634    0.16      0.545   0.783 0.643
+       medial_oa 58         15 0.902 0.795    0.14      0.500   0.933 0.651
+      lateral_oa 58         11 0.537 0.292    0.21      0.154   0.364 0.216
+           pf_oa 58         21 0.671 0.632    0.06      0.421   0.762 0.542
+        effusion 58         35 0.875 0.918    0.32      0.897   0.743 0.812
+       synovitis 58         27 0.666 0.683    0.06      0.581   0.667 0.621
+      baker_cyst 58         12 0.736 0.508    0.45      0.276   0.667 0.390
+  bone_contusion 58         19 0.731 0.651    0.93      0.700   0.368 0.483
+        fracture 58         18 0.856 0.826    0.21      0.609   0.778 0.683
+           MACRO 58        240 0.730 0.642     NaN      0.500   0.701 0.558
+17:13:32 | INFO | AUC macro dorado = 0.7303  (IC95 % bootstrap: 0.682 a 0.775)
+17:13:33 | INFO | Resultados en D:\MIA203\runs\p1\B_resnet50_bce

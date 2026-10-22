@@ -1,0 +1,19 @@
+17:26:47 | INFO | Pesos de la época 11 (AUC val 0.7221)
+17:27:21 | INFO | 
+Métricas en el conjunto dorado:
+        hallazgo  n  positivos   auc    ap  umbral  precision  recall    f1
+             acl 58         24 0.746 0.757    0.11      0.548   0.708 0.618
+             mcl 58          9 0.510 0.183    0.18      0.200   0.333 0.250
+ medial_meniscus 58         26 0.700 0.760    0.06      0.446   0.962 0.610
+lateral_meniscus 58         23 0.611 0.602    0.31      0.688   0.478 0.564
+       medial_oa 58         15 0.901 0.846    0.74      0.632   0.800 0.706
+      lateral_oa 58         11 0.563 0.252    0.77      0.375   0.273 0.316
+           pf_oa 58         21 0.703 0.635    0.24      0.485   0.762 0.593
+        effusion 58         35 0.800 0.846    0.26      0.794   0.771 0.783
+       synovitis 58         27 0.568 0.564    0.19      0.526   0.370 0.435
+      baker_cyst 58         12 0.770 0.499    0.49      0.444   0.667 0.533
+  bone_contusion 58         19 0.775 0.625    0.50      0.471   0.421 0.444
+        fracture 58         18 0.783 0.725    0.05      0.520   0.722 0.605
+           MACRO 58        240 0.702 0.608     NaN      0.511   0.606 0.538
+17:27:21 | INFO | AUC macro dorado = 0.7024  (IC95 % bootstrap: 0.651 a 0.748)
+17:27:21 | INFO | Resultados en D:\MIA203\runs\p1\F_resnet50_sobremuestreo

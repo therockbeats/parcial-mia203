@@ -1,0 +1,15 @@
+{
+  "exp": "A_scratch_bce",
+  "backbone": "scratch",
+  "loss": "bce",
+  "labels_source": "rules",
+  "unmentioned_policy": "negative",
+  "gold_macro_auc": 0.5971360367929295,
+  "gold_macro_auc_ic95": [
+    0.539982810690855,
+    0.6519023493612515
+  ],
+  "gold_macro_f1": 0.47409729463995737,
+  "val_macro_auc": 0.5959348917561724,
+  "n_gold": 58
+}
