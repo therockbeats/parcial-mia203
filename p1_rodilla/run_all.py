@@ -57,6 +57,7 @@ def main() -> None:
     if best:
         sh("p1_rodilla.scripts.s09_gradcam", "--exp", best, *c)
     sh("p1_rodilla.scripts.s11_desbalance_y_sesgo", *c)
+    sh("p1_rodilla.scripts.s13_comparacion_pareada", *c)
     sh("p1_rodilla.scripts.s12_exportar_resultados", *c)
     print(f"\nListo. Mejor experimento: {best} (AUC macro dorado = {best_auc:.4f})")
 
