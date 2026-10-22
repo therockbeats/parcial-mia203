@@ -1,0 +1,41 @@
+# =====================================================================
+#  Entorno "mia203" para la WORKSTATION (Windows 11, 2x RTX 5090)
+#  Crear:      conda env create -f environment.yml
+#  Activar:    conda activate mia203
+#
+#  PyTorch se instala con pip desde el índice oficial con CUDA 12.8,
+#  que es el mínimo que soportan las RTX 5090 (arquitectura Blackwell).
+#  Con versiones anteriores aparece:
+#     "no kernel image is available for execution on the device"
+# =====================================================================
+name: mia203
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pandas
+  - pyarrow
+  - scikit-learn
+  - matplotlib
+  - pyyaml
+  - tqdm
+  - jupyterlab
+  - ipykernel
+  # --- Pregunta 2 (rasterio/GDAL se instalan mucho mejor desde conda-forge) ---
+  - rasterio
+  - geopandas
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu128
+      - torch>=2.7
+      - torchvision>=0.22
+      # --- Pregunta 1: lectura de DICOM (incluye decodificadores JPEG/JPEG2000) ---
+      - pydicom>=3.0
+      - pylibjpeg>=2.0
+      - pylibjpeg-libjpeg
+      - pylibjpeg-openjpeg
+      - opencv-python-headless
+      - langdetect
+      # --- Pregunta 3 ---
+      - ultralytics>=8.3

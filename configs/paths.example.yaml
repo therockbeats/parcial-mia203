@@ -1,0 +1,14 @@
+# =====================================================================
+#  RUTAS LOCALES DE CADA MÁQUINA
+#  Copiar este archivo como configs/paths.local.yaml y ajustar las rutas.
+#  paths.local.yaml está en .gitignore (cada máquina mantiene el suyo).
+#  En Windows las rutas se escriben con "/" (p. ej. "D:/MIA203/data").
+# =====================================================================
+
+# ---------- Estación de entrenamiento (Windows) ----------
+data_root: "D:/MIA203/data"     # carpeta con los datos de las 3 preguntas
+runs_root: "D:/MIA203/runs"     # checkpoints, logs y resultados de entrenamiento
+
+# ---------- Equipo de desarrollo (macOS), alternativa ----------
+# data_root: "/Users/rockbeats/MIA203/data"
+# runs_root: "/Users/rockbeats/MIA203/runs"

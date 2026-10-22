@@ -1,0 +1,21 @@
+# Alternativa a environment.yml para quien use solo pip (por ejemplo, Google Colab).
+# En Windows con RTX 5090 instala primero torch/torchvision con:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+numpy
+pandas
+pyarrow
+scikit-learn
+matplotlib
+pyyaml
+tqdm
+torch>=2.7
+torchvision>=0.22
+pydicom>=3.0
+pylibjpeg>=2.0
+pylibjpeg-libjpeg
+pylibjpeg-openjpeg
+opencv-python-headless
+langdetect
+ultralytics>=8.3
+rasterio
+geopandas

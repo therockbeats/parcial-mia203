@@ -1,0 +1,34 @@
+# =====================================================================
+#  Entorno "mia203" para la MacBook Pro (Apple Silicon, M2 Max)
+#  Sirve para programar, depurar con datos pequeños, EDA y figuras.
+#  PyTorch usa la GPU del chip mediante el backend "mps".
+#  Crear:      conda env create -f environment-mac.yml
+#  Activar:    conda activate mia203
+# =====================================================================
+name: mia203
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pandas
+  - pyarrow
+  - scikit-learn
+  - matplotlib
+  - pyyaml
+  - tqdm
+  - jupyterlab
+  - ipykernel
+  - rasterio
+  - geopandas
+  - pip:
+      - torch>=2.7
+      - torchvision>=0.22
+      - pydicom>=3.0
+      - pylibjpeg>=2.0
+      - pylibjpeg-libjpeg
+      - pylibjpeg-openjpeg
+      - opencv-python-headless
+      - langdetect
+      - ultralytics>=8.3

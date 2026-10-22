@@ -1,0 +1,192 @@
+# =====================================================================
+#  PREGUNTA 1: Clasificación multietiqueta de anomalías de rodilla (MRI)
+#  Archivo único de configuración. Todos los scripts leen este archivo.
+#  {data_root} y {runs_root} se reemplazan con configs/paths.local.yaml
+# =====================================================================
+
+seed: 42
+
+# ---------------------------------------------------------------------
+# 1. Carpetas de datos (fuera del repositorio)
+# ---------------------------------------------------------------------
+data:
+  raw_dir: "{data_root}/p1_rsna_knee/raw"            # descarga de Kaggle TAL CUAL
+  interim_dir: "{data_root}/p1_rsna_knee/interim"    # tablas intermedias (parquet/csv)
+  processed_dir: "{data_root}/p1_rsna_knee/processed" # volúmenes .npy listos para entrenar
+  runs_dir: "{runs_root}/p1"                          # checkpoints y resultados
+  reports_dir: "{repo_root}/p1_rodilla/reports"       # tablas y figuras livianas (sí van a GitHub)
+
+# ---------------------------------------------------------------------
+# 2. Esquema de los archivos de Kaggle
+#    Verificado con el inventario real (p1_rodilla/reports/inventario_datos.md, 22/10/2026):
+#    train.csv (4,407 estudios; 58 con las 12 etiquetas doradas 0/1; todos con reporte),
+#    train_series.csv (24,371 series con plano, supresión grasa y sensibilidad a líquido),
+#    imágenes en train_series/<StudyInstanceUID>/<SeriesInstanceUID>/<SOPInstanceUID>.dcm
+#    (DICOM sin compresión, "Explicit VR Little Endian"), 819,635 archivos, 530.6 GB.
+# ---------------------------------------------------------------------
+schema:
+  studies_csv: "train.csv"        # tabla con un estudio por fila
+  study_col: "StudyInstanceUID"   # columna con el identificador del estudio
+  # Columnas de las 12 etiquetas EN EL MISMO ORDEN que labels.names (más abajo).
+  # Solo 58 filas (las "doradas") tienen valores 0/1; el resto está vacío (NaN).
+  label_cols:
+    - "ACL"
+    - "MCL"
+    - "Medial Meniscus"
+    - "Lateral Meniscus"
+    - "Medial OA"
+    - "Lateral OA"
+    - "PF OA"
+    - "Effusion"
+    - "Synovitis"
+    - "Baker's"
+    - "Contusion"
+    - "Fracture"
+  # Umbral para convertir la etiqueta dorada en 0/1 (ya viene 0/1; se deja por seguridad)
+  gold_positive_threshold: 0.5
+  # Dónde está el texto de los reportes:
+  #   source: "csv"    -> columna 'col' del archivo 'csv'
+  #   source: "folder" -> un archivo de texto por estudio, patrón 'glob'
+  reports:
+    source: "csv"
+    csv: "train.csv"
+    col: "Report"
+    glob: "reports/{study_id}.txt"
+  # Tabla oficial de series. Trae el plano y el tipo de secuencia anotados por los
+  # organizadores; son más confiables que la descripción DICOM (algunas series dicen
+  # literalmente "DummySeriesDesc!").
+  series_csv: "train_series.csv"
+  series_col: "SeriesInstanceUID"
+  series_plane_col: "Anatomical_Plane"     # Sagittal | Coronal | Axial
+  series_fat_sat_col: "Fat_Suppression"    # 1 = con supresión grasa
+  series_fluid_col: "Fluid_Sensitive"      # 1 = secuencia sensible a líquido (PD/T2/STIR)
+  # Carpeta de imágenes: <raw_dir>/<images_subdir>/<study_id>/<series_id>/*.dcm
+  images_subdir: "train_series"
+  dicom_ext: ".dcm"
+
+# ---------------------------------------------------------------------
+# 3. Etiquetas (nombres internos, en este orden en todo el proyecto)
+# ---------------------------------------------------------------------
+labels:
+  names:
+    - acl               # lesión de ligamento cruzado anterior (LCA)
+    - mcl               # lesión de ligamento colateral medial
+    - medial_meniscus   # daño de menisco medial
+    - lateral_meniscus  # daño de menisco lateral
+    - medial_oa         # osteoartrosis compartimento medial
+    - lateral_oa        # osteoartrosis compartimento lateral
+    - pf_oa             # osteoartrosis patelofemoral
+    - effusion          # derrame articular
+    - synovitis         # sinovitis
+    - baker_cyst        # quiste de Baker
+    - bone_contusion    # contusión ósea
+    - fracture          # fractura
+  # Fuente de etiquetas débiles para entrenar: "rules", "llm" o "combined"
+  source: "rules"
+  # Qué hacer con un hallazgo NO mencionado en el reporte:
+  #   "negative" -> se asume ausente (0) con peso weight_unmentioned
+  #   "ignore"   -> no participa en la pérdida (peso 0)
+  unmentioned_policy: "negative"
+  weight_positive: 1.0
+  weight_negative: 1.0
+  weight_uncertain: 0.0      # "posible", "no se descarta"... (0 = ignorar)
+  weight_unmentioned: 0.5
+  uncertain_as: 1            # si weight_uncertain > 0, valor objetivo para inciertos
+
+# ---------------------------------------------------------------------
+# 4. Extracción de etiquetas con LLM local (paso 4, opcional)
+# ---------------------------------------------------------------------
+llm:
+  host: "http://localhost:11434"   # servidor Ollama local
+  model: "qwen2.5:14b-instruct"
+  temperature: 0.0
+  timeout_s: 120
+  only_subset: true                # true: solo estudios seleccionados + dorados
+
+# ---------------------------------------------------------------------
+# 5. Selección de series y estudios
+# ---------------------------------------------------------------------
+selection:
+  # Orden de preferencia de la serie a usar por estudio (la primera que exista)
+  # (null = no importa). Se usan las columnas oficiales de train_series.csv.
+  series_priority:
+    - {plane: "sagittal", fat_sat: true, fluid_sensitive: true}    # sagital DP/T2 con supresión grasa
+    - {plane: "sagittal", fat_sat: null, fluid_sensitive: true}    # sagital DP/T2 sin supresión
+    - {plane: "sagittal", fat_sat: null, fluid_sensitive: null}    # cualquier sagital
+    - {plane: "coronal", fat_sat: true, fluid_sensitive: true}     # último recurso: coronal DP/T2 FS
+  min_slices: 12
+  n_studies: 500          # tamaño del subconjunto (recomendado 300-600)
+  min_pos_per_label: 15   # positivos mínimos por hallazgo en el subconjunto
+  val_fraction: 0.15      # parte del subconjunto para validación interna
+  use_gold_as: "test"     # los ~58 dorados = conjunto de evaluación limpio
+
+# ---------------------------------------------------------------------
+# 6. Preprocesamiento de volúmenes
+# ---------------------------------------------------------------------
+preprocess:
+  n_slices: 24            # cortes por volumen (re-muestreados uniformemente)
+  size: 256               # alto = ancho tras recorte cuadrado y redimensión
+  p_low: 1.0              # percentiles para la ventana de intensidad
+  p_high: 99.5
+  num_workers: 16         # procesos en paralelo
+
+# ---------------------------------------------------------------------
+# 7. Modelo
+# ---------------------------------------------------------------------
+model:
+  # "scratch"        -> CNN 2D diseñada desde cero (resnet pequeña propia)
+  # "resnet18" | "resnet34" | "resnet50" | "efficientnet_b0" -> preentrenada en ImageNet
+  backbone: "resnet50"
+  pretrained: true
+  scratch_channels: [32, 64, 128, 256]
+  pooling: "attention"    # cómo se combinan los cortes: attention | max | mean
+  dropout: 0.3
+  slices_in: 16           # cortes que entran al modelo (de los 24 guardados)
+
+# ---------------------------------------------------------------------
+# 8. Entrenamiento
+# ---------------------------------------------------------------------
+train:
+  epochs: 25
+  batch_size: 8
+  lr: 3.0e-4              # backbone preentrenado: 1e-4 a 3e-4; scratch: 1e-3
+  weight_decay: 1.0e-4
+  warmup_epochs: 1
+  loss: "bce"             # "bce" | "focal"
+  focal_gamma: 2.0
+  pos_weight: "auto"      # "auto" (negativos/positivos, recortado) | "none"
+  pos_weight_max: 10.0
+  sampler: "none"         # "none" | "oversample_rare"
+  amp: true               # precisión mixta bf16 en CUDA
+  grad_clip: 1.0
+  num_workers: 8
+  early_stopping_patience: 6
+  device: "auto"
+
+# ---------------------------------------------------------------------
+# 9. Evaluación e interpretabilidad
+# ---------------------------------------------------------------------
+eval:
+  threshold_strategy: "max_f1_val"   # umbral por hallazgo elegido en validación
+  bootstrap: 1000
+gradcam:
+  findings: ["acl", "medial_meniscus", "effusion", "bone_contusion"]
+  n_cases: 3
+
+# ---------------------------------------------------------------------
+# 10. Ablación (paso 10). Cada experimento = nombre + cambios al config
+# ---------------------------------------------------------------------
+ablation:
+  experiments:
+    - name: "A_scratch_bce"
+      set: ["model.backbone=scratch", "model.pretrained=false", "train.lr=1.0e-3"]
+    - name: "B_resnet50_bce"
+      set: ["model.backbone=resnet50"]
+    - name: "C_resnet50_focal"
+      set: ["model.backbone=resnet50", "train.loss=focal"]
+    - name: "D_resnet18_bce"
+      set: ["model.backbone=resnet18"]
+    - name: "E_resnet50_ignorar_no_mencionados"
+      set: ["model.backbone=resnet50", "labels.unmentioned_policy=ignore"]
+    - name: "F_resnet50_sobremuestreo"
+      set: ["model.backbone=resnet50", "train.sampler=oversample_rare"]
