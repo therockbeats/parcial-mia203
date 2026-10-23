@@ -43,6 +43,7 @@ aproximadamente doce idiomas.
 | Desbalance y sesgo | `s11_desbalance_y_sesgo` | Prevalencias, AUC por hallazgo según prevalencia y tasa de positivos por idioma |
 | Exportación | `s12_exportar_resultados` | Copia de métricas, curvas y mapas a `p1_rodilla/reports/` |
 | Comparación pareada | `s13_comparacion_pareada` | Diferencia de AUC macro frente a la referencia con IC 95 % por bootstrap pareado |
+| Semillas | `s14_semillas` | Corridas adicionales con otras semillas; media y desviación estándar del AUC macro y ensamble de semillas comparado con la referencia |
 
 ### Arquitectura
 Cada volumen se representa como una secuencia de cortes; cada corte, junto con sus dos
@@ -127,7 +128,7 @@ efectiva junto a sus resultados.
 ├── p1_rodilla/
 │   ├── config.yaml          parámetros de la Pregunta 1
 │   ├── run_all.py           pipeline completo
-│   ├── scripts/             etapas s00 a s13
+│   ├── scripts/             etapas s00 a s14
 │   ├── src/                 DICOM, etiquetado, dataset, modelos, pérdidas, métricas, Grad-CAM
 │   └── reports/             tablas, figuras y resultados exportados
 ├── p2_inundaciones/         Pregunta 2
