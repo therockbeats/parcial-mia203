@@ -1,15 +1,12 @@
 """
-Pipeline completo de la Pregunta 1 con UN SOLO COMANDO (requisito de reproducibilidad):
+Pipeline completo de la Pregunta 1.
 
-    python -m p1_rodilla.run_all
+    python -m p1_rodilla.run_all [--desde N] [--smoke]
 
-Ejecuta en orden: metadatos -> etiquetas (reglas) -> selección -> preprocesamiento ->
-ablación (entrena y evalúa todos los experimentos) -> Grad-CAM del mejor -> desbalance y sesgo.
-El inventario (PASO 1) y el LLM (PASO 4) se corren aparte porque son exploratorio/opcional.
-
-Opciones:
-    --desde 7     empieza en el paso 7 (si los anteriores ya están hechos)
-    --smoke       prueba rápida de punta a punta con pocos estudios y 1 época
+Etapas: metadatos (2), etiquetas por reglas (3), selección (5), preprocesamiento (6),
+ablación (10), Grad-CAM del mejor experimento (9), desbalance y sesgo (11), comparación
+pareada (13) y exportación (12). El inventario (1) y el etiquetado con modelo de lenguaje (4)
+se ejecutan por separado.
 """
 from __future__ import annotations
 
@@ -23,6 +20,7 @@ from common.config import REPO_ROOT, load_config
 
 
 def sh(module: str, *extra: str) -> None:
+    """Ejecuta una etapa como módulo de Python."""
     cmd = [sys.executable, "-m", module, *extra]
     print("\n" + "=" * 80 + "\n>> " + " ".join(cmd) + "\n" + "=" * 80, flush=True)
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)

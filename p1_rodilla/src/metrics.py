@@ -1,13 +1,9 @@
 """
-Métricas de la Pregunta 1.
+Métricas de clasificación multietiqueta.
 
-* AUC-ROC por hallazgo: probabilidad de que un estudio positivo reciba mayor
-  puntaje que uno negativo. No depende de ningún umbral. 0.5 = azar, 1 = perfecto.
-* AUC-ROC macro (métrica oficial de la competencia): promedio simple de las 12 AUC,
-  todas con el mismo peso (los hallazgos raros cuentan igual que los frecuentes).
-* Precisión, recall y F1 requieren un UMBRAL: su elección debe justificarse.
-  Aquí se elige, para cada hallazgo, el umbral que maximiza F1 en VALIDACIÓN, y luego se
-  aplica sin cambios al conjunto dorado (el conjunto de evaluación no interviene en ninguna decisión del modelo).
+AUC-ROC por hallazgo y macro (promedio simple sobre hallazgos, métrica oficial), precisión
+promedio, y precisión, sensibilidad y F1 a un umbral por hallazgo. Los umbrales se eligen en
+validación maximizando F1 y se aplican sin cambios al conjunto de evaluación.
 """
 from __future__ import annotations
 
@@ -17,10 +13,12 @@ from sklearn.metrics import average_precision_score, f1_score, precision_score, 
 
 
 def safe_auc(y, p) -> float:
+    """AUC-ROC; NaN si solo hay una clase."""
     return float(roc_auc_score(y, p)) if len(np.unique(y)) == 2 else float("nan")
 
 
 def best_f1_thresholds(y: np.ndarray, p: np.ndarray, grid=None) -> np.ndarray:
+    """Umbral por hallazgo que maximiza F1 en una grilla (0.5 si no hay positivos)."""
     grid = np.linspace(0.05, 0.95, 91) if grid is None else grid
     thr = np.full(y.shape[1], 0.5)
     for k in range(y.shape[1]):
@@ -33,13 +31,13 @@ def best_f1_thresholds(y: np.ndarray, p: np.ndarray, grid=None) -> np.ndarray:
 
 def evaluate(y: np.ndarray, p: np.ndarray, names: list[str], thresholds: np.ndarray | None = None,
              mask: np.ndarray | None = None) -> pd.DataFrame:
-    """Tabla con AUC, AP, precisión, recall y F1 por hallazgo + fila MACRO."""
+    """AUC, AP, precisión, sensibilidad y F1 por hallazgo, con una fila MACRO."""
     thresholds = np.full(len(names), 0.5) if thresholds is None else thresholds
     rows = []
     for k, n in enumerate(names):
         sel = np.ones(len(y), bool) if mask is None else mask[:, k] > 0
         yk, pk = y[sel, k].astype(int), p[sel, k]
-        if sel.sum() == 0:  # ningún estudio con etiqueta válida para este hallazgo
+        if sel.sum() == 0:
             rows.append({"hallazgo": n, "n": 0, "positivos": 0, "auc": float("nan"), "ap": float("nan"),
                          "umbral": float(thresholds[k]), "precision": float("nan"), "recall": float("nan"),
                          "f1": float("nan")})
@@ -63,6 +61,7 @@ def evaluate(y: np.ndarray, p: np.ndarray, names: list[str], thresholds: np.ndar
 
 
 def macro_auc(y: np.ndarray, p: np.ndarray, mask: np.ndarray | None = None) -> float:
+    """Promedio de las AUC por hallazgo, ignorando las no definidas."""
     aucs = []
     for k in range(y.shape[1]):
         sel = np.ones(len(y), bool) if mask is None else mask[:, k] > 0
@@ -71,7 +70,7 @@ def macro_auc(y: np.ndarray, p: np.ndarray, mask: np.ndarray | None = None) -> f
 
 
 def bootstrap_macro_auc(y: np.ndarray, p: np.ndarray, n: int = 1000, seed: int = 0) -> tuple[float, float]:
-    """Intervalo de confianza del 95 % del AUC macro remuestreando estudios con reemplazo."""
+    """IC 95 % del AUC macro por bootstrap de estudios."""
     rng = np.random.default_rng(seed)
     vals = []
     for _ in range(n):

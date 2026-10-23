@@ -32,6 +32,7 @@ aproximadamente doce idiomas.
 | Inventario | `s01_inventario` | Estructura de la descarga, esquema de tablas y muestra de cabeceras DICOM |
 | Metadatos | `s02_metadatos_series` | Plano, supresión grasa, sensibilidad a líquido, ponderación y parámetros de adquisición por serie; concordancia entre la cabecera DICOM y la anotación oficial |
 | Etiquetas débiles | `s03_etiquetas_reglas` | Extracción multilingüe basada en reglas con detección de negación e incertidumbre; acuerdo (kappa de Cohen, sensibilidad, especificidad) contra las 58 etiquetas doradas, global y por idioma |
+| Análisis de errores | `s03b_errores_reglas` | Falsos positivos y negativos de las reglas en la partición de desarrollo de los estudios dorados |
 | Etiquetas débiles (alternativa) | `s04_etiquetas_llm` | Extracción con un modelo de lenguaje local (Ollama) con salida restringida a un esquema JSON |
 | Selección | `s05_seleccionar_estudios` | Una serie por estudio (sagital DP/T2 con supresión grasa como primera opción) y subconjunto estratificado de 500 estudios con un mínimo de positivos por hallazgo; partición entrenamiento / validación / dorado |
 | Preprocesamiento | `s06_preprocesar` | Ordenamiento espacial de cortes, ventana de intensidad por percentiles, remuestreo a 24 cortes y 256×256 px |
@@ -41,6 +42,7 @@ aproximadamente doce idiomas.
 | Ablación | `s10_ablacion` | Seis configuraciones (tabla abajo) |
 | Desbalance y sesgo | `s11_desbalance_y_sesgo` | Prevalencias, AUC por hallazgo según prevalencia y tasa de positivos por idioma |
 | Exportación | `s12_exportar_resultados` | Copia de métricas, curvas y mapas a `p1_rodilla/reports/` |
+| Comparación pareada | `s13_comparacion_pareada` | Diferencia de AUC macro frente a la referencia con IC 95 % por bootstrap pareado |
 
 ### Arquitectura
 Cada volumen se representa como una secuencia de cortes; cada corte, junto con sus dos
@@ -125,7 +127,7 @@ efectiva junto a sus resultados.
 ├── p1_rodilla/
 │   ├── config.yaml          parámetros de la Pregunta 1
 │   ├── run_all.py           pipeline completo
-│   ├── scripts/             etapas s00 a s12
+│   ├── scripts/             etapas s00 a s13
 │   ├── src/                 DICOM, etiquetado, dataset, modelos, pérdidas, métricas, Grad-CAM
 │   └── reports/             tablas, figuras y resultados exportados
 ├── p2_inundaciones/         Pregunta 2
@@ -149,13 +151,4 @@ efectiva junto a sus resultados.
 
 ## Declaración sobre el uso de herramientas de asistencia
 
-Durante el desarrollo de este trabajo se utilizó un asistente de inteligencia artificial
-generativa (Claude, de Anthropic) como herramienta de apoyo. El asistente se empleó para
-proponer la estructura del repositorio, generar una primera versión del código del pipeline
-de la Pregunta 1 y de su configuración, y redactar documentación de apoyo para la
-preparación del entorno.
-
-El equipo es responsable de la verificación y adaptación del código a los datos reales, la
-ejecución de todos los experimentos, la interpretación y el análisis de los resultados, y la
-redacción del informe. Todos los integrantes revisaron el código y asumen la responsabilidad
-por su contenido.
+En conformidad con los lineamientos académicos del curso, se utilizaron modelos de lenguaje de gran escala (LLMs) como herramientas de consulta técnica, apoyo en la depuración de scripts y revisión de estilo en la documentación técnica. El diseño metodológico, la formulación de reglas clínicas, la estructuración de la arquitectura 2.5D, la ejecución de los experimentos en GPU y el análisis crítico de las métricas fueron realizados y validados íntegramente por los autores del trabajo.

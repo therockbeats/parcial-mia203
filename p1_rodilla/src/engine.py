@@ -1,6 +1,4 @@
-"""
-Piezas reutilizables de entrenamiento y predicción (las usan s07, s08, s09 y s10).
-"""
+"""Construcción de datasets y loaders, precisión mixta e inferencia."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,7 +14,7 @@ from .labels_rules import POS
 
 
 def load_split(cfg: dict) -> pd.DataFrame:
-    """split.csv sin los estudios cuyo volumen .npy no existe (fallos de preprocesamiento)."""
+    """Partición ``split.csv`` restringida a los estudios con volumen preprocesado."""
     df = pd.read_csv(Path(cfg["data"]["interim_dir"]) / "split.csv", dtype={"study_id": str, "series_id": str})
     proc = Path(cfg["data"]["processed_dir"])
     ok = [(proc / f"{r.study_id}__{r.series_id}.npy").exists() for r in df.itertuples()]
@@ -24,8 +22,9 @@ def load_split(cfg: dict) -> pd.DataFrame:
 
 
 def make_dataset(cfg: dict, df: pd.DataFrame, train: bool) -> KneeVolumeDataset:
+    """Dataset con objetivos y pesos; en el conjunto dorado todas las etiquetas pesan 1."""
     names = cfg["labels"]["names"]
-    if (df["split"] == "gold").all():   # dorado: etiquetas exactas, peso 1 en todo
+    if (df["split"] == "gold").all():
         y = (df[names].to_numpy() == POS).astype(np.float32)
         w = np.ones_like(y)
     else:
@@ -34,10 +33,11 @@ def make_dataset(cfg: dict, df: pd.DataFrame, train: bool) -> KneeVolumeDataset:
 
 
 def make_loader(cfg: dict, ds: KneeVolumeDataset, train: bool) -> DataLoader:
+    """DataLoader; con ``sampler: oversample_rare`` muestrea según la rareza de los positivos."""
     t = cfg["train"]
     sampler = None
     if train and t.get("sampler") == "oversample_rare":
-        # Cada estudio recibe probabilidad proporcional a la rareza de sus hallazgos positivos
+        # Peso de muestreo: 1 + máximo de (positivo / prevalencia) entre los hallazgos del estudio
         y = ds.y.numpy()
         freq = y.mean(0) + 1e-3
         weights = 1.0 + (y / freq).max(1)
@@ -49,7 +49,7 @@ def make_loader(cfg: dict, ds: KneeVolumeDataset, train: bool) -> DataLoader:
 
 
 def autocast_ctx(device: torch.device, enabled: bool):
-    """Precisión mixta bf16 solo en CUDA (en MPS/CPU se trabaja en float32)."""
+    """Contexto de precisión mixta bf16 en CUDA; float32 en MPS y CPU."""
     if enabled and device.type == "cuda":
         return torch.autocast("cuda", dtype=torch.bfloat16)
     return torch.autocast("cpu", enabled=False)
@@ -57,7 +57,7 @@ def autocast_ctx(device: torch.device, enabled: bool):
 
 @torch.no_grad()
 def predict(model, loader, device, amp: bool = True) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Devuelve (probabilidades, objetivos, pesos) para todo el loader."""
+    """Probabilidades, objetivos y pesos de todos los lotes del loader."""
     model.eval()
     ps, ys, ws = [], [], []
     for x, y, w in loader:

@@ -1,15 +1,10 @@
 """
-Carga de configuración (archivos YAML) para todo el proyecto.
+Carga y composición de la configuración del proyecto.
 
-Idea general
-------------
-Cada pregunta tiene su archivo ``config.yaml`` con TODOS los parámetros
-(rutas, columnas de los CSV, hiperparámetros...). Así no hay "números mágicos"
-escondidos dentro del código y cada experimento queda documentado.
-
-Las rutas pueden usar marcadores ``{data_root}`` y ``{runs_root}``. Esos valores
-se leen de ``configs/paths.local.yaml``, que es distinto en la Mac y en Windows.
-De esta forma el MISMO código corre en ambas máquinas sin cambiar nada.
+Cada pregunta define sus parámetros en un ``config.yaml`` (rutas, esquema de datos,
+hiperparámetros). Las rutas admiten los marcadores ``{data_root}``, ``{runs_root}`` y
+``{repo_root}``; los dos primeros se resuelven con ``configs/paths.local.yaml``
+(o con el archivo indicado en la variable de entorno ``MIA203_PATHS``).
 """
 from __future__ import annotations
 
@@ -20,32 +15,28 @@ from typing import Any
 
 import yaml
 
-# Carpeta raíz del repositorio: este archivo está en <repo>/common/config.py,
-# así que subimos dos niveles (parents[1]).
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def load_yaml(path: str | Path) -> dict:
-    """Lee un archivo YAML y lo devuelve como diccionario de Python."""
+    """Lee un archivo YAML y lo devuelve como diccionario."""
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}
 
 
 def load_machine_paths() -> dict:
     """
-    Lee las rutas propias de esta máquina.
+    Rutas de datos y resultados de la máquina actual.
 
-    Orden de búsqueda:
-      1. Variable de entorno MIA203_PATHS (ruta a un YAML), si existe.
-      2. configs/paths.local.yaml dentro del repositorio.
+    Se lee el YAML indicado en ``MIA203_PATHS`` o, en su defecto,
+    ``configs/paths.local.yaml``. Debe definir ``data_root`` y ``runs_root``.
     """
     env = os.environ.get("MIA203_PATHS")
     candidate = Path(env) if env else REPO_ROOT / "configs" / "paths.local.yaml"
     if not candidate.exists():
         raise FileNotFoundError(
-            f"No encuentro {candidate}.\n"
-            "Copia configs/paths.example.yaml como configs/paths.local.yaml "
-            "y ajusta data_root y runs_root para esta máquina."
+            f"No se encontró {candidate}. "
+            "Crear configs/paths.local.yaml a partir de configs/paths.example.yaml."
         )
     paths = load_yaml(candidate)
     for key in ("data_root", "runs_root"):
@@ -55,7 +46,7 @@ def load_machine_paths() -> dict:
 
 
 def _fill_placeholders(obj: Any, values: dict) -> Any:
-    """Reemplaza {data_root} y {runs_root} en todos los textos del config (recursivo)."""
+    """Sustituye recursivamente los marcadores ``{clave}`` en las cadenas del config."""
     if isinstance(obj, dict):
         return {k: _fill_placeholders(v, values) for k, v in obj.items()}
     if isinstance(obj, list):
@@ -68,21 +59,20 @@ def _fill_placeholders(obj: Any, values: dict) -> Any:
 
 
 def _parse_value(text: str) -> Any:
-    """Convierte el texto de un override ('0.001', 'true', '[1,2]') al tipo correcto usando YAML."""
+    """Interpreta el valor de un override con la sintaxis de YAML (números, booleanos, listas)."""
     return yaml.safe_load(text)
 
 
 def apply_overrides(cfg: dict, overrides: list[str] | None) -> dict:
     """
-    Aplica cambios del tipo  seccion.clave=valor  desde la línea de comandos.
+    Aplica overrides de la forma ``seccion.clave=valor``.
 
-    Ejemplo:  --set train.loss=focal --set model.backbone=resnet18
-    Esto permite lanzar ablaciones sin duplicar archivos de configuración.
+    Ejemplo: ``["train.loss=focal", "model.backbone=resnet18"]``.
     """
     cfg = copy.deepcopy(cfg)
     for item in overrides or []:
         if "=" not in item:
-            raise ValueError(f"Override inválido '{item}'. Usa seccion.clave=valor")
+            raise ValueError(f"Override inválido '{item}' (formato esperado: seccion.clave=valor)")
         dotted, raw = item.split("=", 1)
         keys = dotted.split(".")
         node = cfg
@@ -93,7 +83,7 @@ def apply_overrides(cfg: dict, overrides: list[str] | None) -> dict:
 
 
 def load_config(config_path: str | Path, overrides: list[str] | None = None) -> dict:
-    """Carga el config de una pregunta, aplica overrides y rellena las rutas de la máquina."""
+    """Carga un config, aplica overrides y resuelve las rutas de la máquina."""
     cfg = load_yaml(config_path)
     cfg = apply_overrides(cfg, overrides)
     paths = load_machine_paths()
@@ -104,7 +94,7 @@ def load_config(config_path: str | Path, overrides: list[str] | None = None) -> 
 
 
 def save_config(cfg: dict, path: str | Path) -> None:
-    """Guarda el config efectivo de un experimento (para reproducibilidad)."""
+    """Guarda la configuración efectiva de un experimento."""
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         yaml.safe_dump(cfg, f, allow_unicode=True, sort_keys=False)

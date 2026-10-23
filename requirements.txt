@@ -1,5 +1,4 @@
-# Alternativa a environment.yml para quien use solo pip (por ejemplo, Google Colab).
-# En Windows con RTX 5090 instala primero torch/torchvision con:
+# Alternativa a environment.yml con pip. Para CUDA 12.8 instalar antes PyTorch con:
 #   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 numpy
 pandas

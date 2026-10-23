@@ -6,8 +6,8 @@
 # =====================================================================
 
 # ---------- Estación de entrenamiento (Windows) ----------
-data_root: "D:/MIA203/data"     # carpeta con los datos de las 3 preguntas
-runs_root: "D:/MIA203/runs"     # checkpoints, logs y resultados de entrenamiento
+data_root: "D:/MIA203/data"     # datos de las tres preguntas
+runs_root: "D:/MIA203/runs"     # pesos, registros y resultados
 
 # ---------- Equipo de desarrollo (macOS), alternativa ----------
 # data_root: "/Users/rockbeats/MIA203/data"

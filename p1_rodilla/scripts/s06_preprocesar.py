@@ -1,16 +1,18 @@
 """
-PASO 6. Preprocesamiento: DICOM -> volúmenes .npy listos para entrenar.
+Etapa 6. Preprocesamiento de las series seleccionadas a volúmenes ``.npy``.
 
-Para cada serie elegida en split.csv:
-    1. Carga todos los cortes DICOM y los ordena espacialmente.
-    2. Ventana de intensidad por percentiles (p_low..p_high) -> 0..255.
-    3. Re-muestrea a n_slices cortes y redimensiona a size x size.
-    4. Guarda <processed_dir>/<study_id>__<series_id>.npy (uint8, ~1.5 MB).
+Para cada serie de ``split.csv``: lectura y ordenamiento espacial de los cortes, ventana de
+intensidad por percentiles, remuestreo a ``n_slices`` cortes y redimensión a
+``size`` x ``size``. Se guarda ``<processed_dir>/<study_id>__<series_id>.npy`` (uint8).
+La ejecución es paralela y omite los volúmenes ya existentes.
 
-Hacer esto UNA vez evita leer y decodificar DICOM en cada época (lo más lento).
-Usa varios procesos en paralelo; si se corta, al volver a correr salta lo ya hecho.
+Salidas:
+    <processed_dir>/*.npy
+    <interim_dir>/preprocess_errors.csv (si hay errores)
+    p1_rodilla/reports/figuras/control_preprocesado.png
 
-Uso:  python -m p1_rodilla.scripts.s06_preprocesar   [--workers 20]
+Uso:
+    python -m p1_rodilla.scripts.s06_preprocesar [--workers 20]
 """
 from __future__ import annotations
 
@@ -28,6 +30,7 @@ from p1_rodilla.src.dicom_utils import load_series_volume, normalize_volume
 
 
 def _one(args):
+    """Preprocesa una serie (ejecutado en un proceso del pool)."""
     series_dir, out_path, ext, n_slices, size, p_low, p_high = args
     if Path(out_path).exists():
         return out_path, "existente"
@@ -67,9 +70,9 @@ def main() -> None:
     if len(errs):
         p = Path(cfg["data"]["interim_dir"]) / "preprocess_errors.csv"
         errs.to_csv(p, index=False)
-        log.warning(f"{len(errs)} series fallaron; detalle en {p}. Esos estudios se omitirán al entrenar.")
+        log.warning(f"{len(errs)} series con error (detalle en {p}); se excluyen del entrenamiento.")
 
-    # Control visual: mosaico con el corte central de 12 volúmenes al azar
+    # Control de calidad: corte central de 12 volúmenes al azar
     import matplotlib
 
     matplotlib.use("Agg")
@@ -89,7 +92,7 @@ def main() -> None:
         fig.tight_layout()
         fig_path = ensure_dir(Path(cfg["data"]["reports_dir"]) / "figuras") / "control_preprocesado.png"
         fig.savefig(fig_path, dpi=120)
-        log.info(f"Revisa visualmente {fig_path}: deben verse rodillas sagitales nítidas y bien contrastadas")
+        log.info(f"Figura de control de calidad: {fig_path}")
 
 
 if __name__ == "__main__":

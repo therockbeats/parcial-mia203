@@ -1,17 +1,9 @@
 """
-Grad-CAM implementado desde cero (Selvaraju et al., 2017).
+Grad-CAM (Selvaraju et al., 2017) sobre la salida de ``encoder.forward_features``.
 
-Idea
-----
-Para el hallazgo k, queremos saber QUÉ PÍXELES empujaron su logit hacia arriba.
-1. Guardamos el mapa de características A de la última capa convolucional
-   (forma C x h x w) y el gradiente dLogit_k/dA (misma forma).
-2. Peso de cada canal c: alpha_c = promedio espacial del gradiente del canal c.
-3. Mapa: CAM = ReLU( sum_c alpha_c * A_c )   (solo lo que AUMENTA el logit).
-4. Se reescala al tamaño de la imagen y se superpone en color.
-
-En nuestro modelo 2.5D hay un mapa por corte; mostramos el corte con mayor
-peso de atención (el que el modelo "miró" más) o el de mayor energía del CAM.
+Para el hallazgo k: alpha_c = media espacial de d logit_k / d A_c y
+CAM = ReLU(sum_c alpha_c A_c), reescalado al tamaño de la imagen y normalizado a [0, 1].
+Se obtiene un mapa por corte.
 """
 from __future__ import annotations
 
@@ -21,6 +13,8 @@ import torch.nn.functional as F
 
 
 class GradCAM:
+    """Calcula Grad-CAM interceptando ``forward_features`` del codificador."""
+
     def __init__(self, model):
         self.model = model
         self.acts = None
@@ -30,17 +24,18 @@ class GradCAM:
 
         def hooked(x):
             a = self._orig(x)
-            a.retain_grad()          # pedimos a PyTorch que guarde el gradiente de este tensor
+            a.retain_grad()
             self.acts = a
             return a
 
         enc.forward_features = hooked
 
     def remove(self):
+        """Restaura el método original del codificador."""
         self.model.encoder.forward_features = self._orig
 
     def __call__(self, x: torch.Tensor, k: int):
-        """x: (1, S, 3, H, W). Devuelve (cams (S,H,W) en [0,1], atención (S,) o None, prob_k)."""
+        """Para ``x`` (1, S, 3, H, W) devuelve mapas (S, H, W), pesos de atención (S,) y probabilidad."""
         self.model.zero_grad(set_to_none=True)
         logits, att = self.model(x, return_attention=True)
         logits[0, k].backward()
@@ -55,7 +50,7 @@ class GradCAM:
 
 
 def overlay(gray: np.ndarray, cam: np.ndarray, alpha: float = 0.4) -> np.ndarray:
-    """Superpone el mapa (colormap 'jet') sobre la imagen en gris. Devuelve RGB float [0,1]."""
+    """Superposición del mapa (colormap jet) sobre la imagen en gris, en RGB [0, 1]."""
     import matplotlib.cm as cm
 
     g = (gray - gray.min()) / (gray.max() - gray.min() + 1e-8)

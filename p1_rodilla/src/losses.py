@@ -1,18 +1,11 @@
 """
-Funciones de pérdida multietiqueta con pesos por elemento.
+Pérdidas multietiqueta ponderadas por elemento.
 
-BCE (entropía cruzada binaria), una por hallazgo:
-    L = -[ y log p + (1-y) log(1-p) ],  con p = sigmoide(logit)
-  * pos_weight multiplica el término de los positivos: compensa hallazgos raros
-    (si un hallazgo tiene 1 positivo por cada 20 negativos, pos_weight ~ 20).
+WeightedBCE    entropía cruzada binaria con ``pos_weight`` por hallazgo.
+WeightedFocal  pérdida focal (Lin et al., 2017): (1 - p_t)^gamma * BCE.
 
-Pérdida focal (Lin et al., 2017):
-    FL = -(1 - p_t)^gamma * log(p_t)
-  * Reduce el peso de los ejemplos fáciles (p_t cercano a 1) y concentra el
-    aprendizaje en los difíciles. Útil con desbalance fuerte (fractura, quiste de Baker).
-
-En ambas, w (peso por estudio y hallazgo) permite ignorar etiquetas inciertas (w=0)
-o confiar menos en las "no mencionadas" (w=0.5).
+En ambas, ``w`` (estudio x hallazgo) pondera cada término; ``w = 0`` lo excluye.
+La pérdida se normaliza por la suma de pesos.
 """
 from __future__ import annotations
 
@@ -22,6 +15,8 @@ import torch.nn.functional as F
 
 
 class WeightedBCE(nn.Module):
+    """BCE con pesos por elemento y ``pos_weight`` opcional."""
+
     def __init__(self, pos_weight: torch.Tensor | None = None):
         super().__init__()
         self.register_buffer("pos_weight", pos_weight if pos_weight is not None else torch.tensor([]))
@@ -33,6 +28,8 @@ class WeightedBCE(nn.Module):
 
 
 class WeightedFocal(nn.Module):
+    """Pérdida focal con pesos por elemento y ``pos_weight`` opcional."""
+
     def __init__(self, gamma: float = 2.0, pos_weight: torch.Tensor | None = None):
         super().__init__()
         self.gamma = gamma
@@ -48,7 +45,7 @@ class WeightedFocal(nn.Module):
 
 
 def compute_pos_weight(y, w, max_value: float = 10.0) -> torch.Tensor:
-    """pos_weight_k = (# negativos válidos) / (# positivos válidos), recortado a max_value."""
+    """``pos_weight_k`` = negativos válidos / positivos válidos, acotado a [1, max_value]."""
     y, w = torch.as_tensor(y), torch.as_tensor(w)
     valid = w > 0
     pos = ((y == 1) & valid).sum(0).float()
@@ -57,6 +54,7 @@ def compute_pos_weight(y, w, max_value: float = 10.0) -> torch.Tensor:
 
 
 def build_loss(cfg: dict, y_train, w_train) -> nn.Module:
+    """Pérdida según ``train.loss`` y ``train.pos_weight``."""
     t = cfg["train"]
     pw = compute_pos_weight(y_train, w_train, t.get("pos_weight_max", 10.0)) if t.get("pos_weight") == "auto" else None
     if t.get("loss", "bce") == "focal":

@@ -1,15 +1,15 @@
 """
-PASO 9. Interpretabilidad con Grad-CAM (entregable 5).
+Etapa 9. Mapas Grad-CAM en estudios dorados positivos.
 
-Para cada hallazgo de gradcam.findings (al menos 3), toma n_cases estudios DORADOS positivos
-con mayor probabilidad predicha y muestra:
-    corte con más atención | mapa Grad-CAM superpuesto
-Criterio de análisis: ¿el mapa resalta la región anatómica
-correcta? (menisco -> cuernos meniscales; LCA -> escotadura intercondílea; derrame ->
-receso suprapatelar; contusión -> hueso subcondral).
+Para cada hallazgo de ``gradcam.findings`` se toman los ``n_cases`` estudios dorados positivos
+con mayor probabilidad predicha y se muestra el corte con mayor peso de atención junto al mapa
+superpuesto.
 
-Salidas: <runs_dir>/<exp>/gradcam/<hallazgo>.png
-Uso:  python -m p1_rodilla.scripts.s09_gradcam --exp B_resnet50_bce
+Salidas:
+    <runs_dir>/<exp>/gradcam/<hallazgo>.png
+
+Uso:
+    python -m p1_rodilla.scripts.s09_gradcam --exp B_resnet50_bce
 """
 from __future__ import annotations
 
@@ -59,7 +59,7 @@ def main() -> None:
         k = names.index(finding)
         pos = gold.index[gold[finding] == POS].tolist()
         if not pos:
-            log.warning(f"{finding}: no hay estudios dorados positivos")
+            log.warning(f"{finding}: sin estudios dorados positivos")
             continue
         if preds is not None:
             pos = sorted(pos, key=lambda i: -float(preds.loc[preds.study_id == gold.study_id[i], finding].iloc[0]))
@@ -70,7 +70,7 @@ def main() -> None:
             x = x.unsqueeze(0).to(device)
             cams, att, prob = cam(x, k)
             s = int(np.argmax(att)) if att is not None else int(np.argmax(cams.reshape(len(cams), -1).sum(1)))
-            img = x[0, s, 1].detach().cpu().numpy()          # canal central del triplete
+            img = x[0, s, 1].detach().cpu().numpy()          # canal central
             axes[row, 0].imshow(img, cmap="gray")
             axes[row, 0].set_title(f"…{gold.study_id[i][-8:]} | corte {s}", fontsize=9)
             axes[row, 1].imshow(overlay(img, cams[s]))

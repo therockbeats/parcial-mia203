@@ -12,4 +12,4 @@ p3_fauna/
 ├── notebooks/
 └── reports/
 ```
-Ubicación de los datos: `D:\MIA203\data\p3_cct20\raw\` (imágenes + anotaciones COCO de LILA BC).
+Datos: `<data_root>/p3_cct20/raw/` (imágenes y anotaciones COCO de LILA BC).

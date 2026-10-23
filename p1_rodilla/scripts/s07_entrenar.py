@@ -1,23 +1,17 @@
 """
-PASO 7. Entrenamiento de un modelo (un experimento).
+Etapa 7. Entrenamiento de un experimento.
 
-Ejemplos (desde la raíz del repositorio):
-    # Modelo B: ResNet-50 preentrenada (valores por defecto del config)
-    python -m p1_rodilla.scripts.s07_entrenar --exp B_resnet50_bce
-
-    # Modelo A: CNN desde cero
-    python -m p1_rodilla.scripts.s07_entrenar --exp A_scratch_bce --set model.backbone=scratch --set model.pretrained=false --set train.lr=1e-3
-
-    # Prueba rápida en la Mac (2 épocas, pocos estudios)
-    python -m p1_rodilla.scripts.s07_entrenar --exp prueba_mac --set train.epochs=2 --smoke
-
-Qué hace en cada época:
-    1. Recorre los lotes de entrenamiento: forward -> pérdida -> backward -> paso del optimizador.
-    2. Evalúa en validación: AUC-ROC macro (métrica oficial) usando solo etiquetas con peso > 0.
-    3. Si el AUC mejora, guarda best.pt. Si no mejora en 'early_stopping_patience' épocas, se detiene.
+AdamW con calentamiento lineal y decaimiento coseno, precisión mixta bf16 (CUDA), recorte de
+gradiente y detención temprana por AUC macro en validación (solo etiquetas con peso > 0).
 
 Salidas en <runs_dir>/<exp>/:
-    best.pt  (pesos), history.csv (pérdida y AUC por época), config.yaml (config efectivo), train.log
+    best.pt, history.csv, config.yaml (configuración efectiva), train.log
+
+Uso:
+    python -m p1_rodilla.scripts.s07_entrenar --exp B_resnet50_bce
+    python -m p1_rodilla.scripts.s07_entrenar --exp A_scratch_bce \\
+        --set model.backbone=scratch --set model.pretrained=false --set train.lr=1e-3
+    python -m p1_rodilla.scripts.s07_entrenar --exp prueba --set train.epochs=1 --smoke
 """
 from __future__ import annotations
 
@@ -37,7 +31,7 @@ from p1_rodilla.src.models import build_model, count_parameters
 
 
 def cosine_with_warmup(optimizer, warmup_steps: int, total_steps: int):
-    """Learning rate: sube linealmente durante el warm-up y luego baja como un coseno hasta ~0."""
+    """Programa de tasa de aprendizaje: calentamiento lineal seguido de decaimiento coseno."""
     def f(step):
         if step < warmup_steps:
             return (step + 1) / max(1, warmup_steps)
@@ -51,7 +45,7 @@ def main() -> None:
     ap.add_argument("--config", default=str(REPO_ROOT / "p1_rodilla" / "config.yaml"))
     ap.add_argument("--exp", required=True, help="nombre del experimento (carpeta de salida)")
     ap.add_argument("--set", action="append", default=[], help="override seccion.clave=valor (repetible)")
-    ap.add_argument("--smoke", action="store_true", help="prueba rápida: 24 estudios de train y 12 de val")
+    ap.add_argument("--smoke", action="store_true", help="ejecución reducida: 24 estudios de entrenamiento y 12 de validación")
     args = ap.parse_args()
 
     cfg = load_config(args.config, args.set)
@@ -90,14 +84,14 @@ def main() -> None:
         t0, running, nb = time.time(), 0.0, 0
         for x, y, w in dl_tr:
             x, y, w = x.to(device, non_blocking=True), y.to(device), w.to(device)
-            optimizer.zero_grad(set_to_none=True)          # 1) limpiar gradientes anteriores
+            optimizer.zero_grad(set_to_none=True)
             with autocast_ctx(device, amp):
-                logits = model(x)                           # 2) forward
-            loss = criterion(logits.float(), y, w)          # 3) pérdida (en float32 por estabilidad)
-            loss.backward()                                 # 4) backward: gradientes
+                logits = model(x)
+            loss = criterion(logits.float(), y, w)          # pérdida en float32
+            loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), float(t.get("grad_clip", 1.0)))
-            optimizer.step()                                # 5) actualizar pesos
-            scheduler.step()                                # 6) actualizar learning rate
+            optimizer.step()
+            scheduler.step()
             running += loss.item()
             nb += 1
         p_va, y_va, w_va = predict(model, dl_va, device, amp)
@@ -113,9 +107,9 @@ def main() -> None:
         else:
             wait += 1
             if wait >= int(t.get("early_stopping_patience", 6)):
-                log.info(f"Early stopping: {wait} épocas sin mejorar")
+                log.info(f"Detención temprana: {wait} épocas sin mejora")
                 break
-    if best < 0:  # validación sin positivos suficientes (p. ej. en --smoke): guardamos el último
+    if best < 0:  # AUC de validación no definido: se guarda el último estado
         torch.save({"model": model.state_dict(), "epoch": epoch, "val_macro_auc": float("nan")}, out / "best.pt")
     log.info(f"Mejor AUC macro en validación: {best:.4f}. Pesos en {out / 'best.pt'}")
 

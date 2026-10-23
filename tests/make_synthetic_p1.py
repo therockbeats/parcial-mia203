@@ -1,13 +1,8 @@
 """
-Genera un mini conjunto de datos FALSO con la misma estructura REAL de Kaggle
-(verificada con el inventario del 22/10/2026: train.csv con StudyInstanceUID, Report y 12
-columnas de etiqueta; train_series.csv con plano/supresión grasa/sensibilidad a líquido;
-imágenes en train_series/<estudio>/<serie>/*.dcm),
-para probar el pipeline de la Pregunta 1 de punta a punta en minutos (sin GPU).
+Conjunto sintético con la estructura del conjunto RSNA (train.csv, train_series.csv y
+train_series/<estudio>/<serie>/*.dcm) para pruebas de extremo a extremo.
 
-    python tests/make_synthetic_p1.py --out /ruta/data/p1_rsna_knee/raw --studies 60
-
-No reemplaza a los datos reales: solo verifica que el código corre sin errores.
+    python tests/make_synthetic_p1.py --out <data_root>/p1_rsna_knee/raw --studies 60
 """
 from __future__ import annotations
 
@@ -21,7 +16,7 @@ from pydicom.uid import ExplicitVRLittleEndian, generate_uid
 
 LABELS = ["acl", "mcl", "medial_meniscus", "lateral_meniscus", "medial_oa", "lateral_oa", "pf_oa",
           "effusion", "synovitis", "baker_cyst", "bone_contusion", "fracture"]
-# Nombres de columna tal como vienen en train.csv de Kaggle
+# Nombres de columna de train.csv
 KAGGLE_COLS = ["ACL", "MCL", "Medial Meniscus", "Lateral Meniscus", "Medial OA", "Lateral OA", "PF OA",
                "Effusion", "Synovitis", "Baker's", "Contusion", "Fracture"]
 PHRASES = {
@@ -44,11 +39,12 @@ PHRASES = {
 
 
 def write_series(folder: Path, n_slices: int, size: int, plane: str, desc: str, signal: float, rng):
+    """Escribe una serie DICOM sintética con orientación, posición y señal controladas."""
     folder.mkdir(parents=True, exist_ok=True)
     iop = {"sagittal": [0, 1, 0, 0, 0, -1], "coronal": [1, 0, 0, 0, 0, -1], "axial": [1, 0, 0, 0, 1, 0]}[plane]
     normal = np.cross(iop[:3], iop[3:])
     study_uid, series_uid = generate_uid(), generate_uid()
-    order = rng.permutation(n_slices)   # archivos desordenados a propósito: el código debe ordenar por posición
+    order = rng.permutation(n_slices)   # orden de archivos aleatorio
     for k, s in enumerate(order):
         meta = FileMetaDataset()
         meta.MediaStorageSOPClassUID = "1.2.840.10008.5.1.4.1.1.4"
@@ -71,6 +67,7 @@ def write_series(folder: Path, n_slices: int, size: int, plane: str, desc: str, 
 
 
 def main() -> None:
+    """Genera los CSV y las series DICOM del conjunto sintético."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--studies", type=int, default=60)
@@ -87,7 +84,7 @@ def main() -> None:
         row = {"StudyInstanceUID": sid, "Report": text}
         row.update({k: (float(truth[l]) if i < args.gold else np.nan) for l, k in zip(LABELS, KAGGLE_COLS)})
         rows.append(row)
-        # (plano, descripción DICOM, supresión grasa, sensible a líquido); una descripción anonimizada a propósito
+        # (plano, descripción DICOM, supresión grasa, sensible a líquido)
         for j, (plane, desc, fs, fluid) in enumerate([("sagittal", "DummySeriesDesc!", 1, 1),
                                                       ("coronal", "COR T1", 0, 0),
                                                       ("axial", "AX PD FS", 1, 1)]):

@@ -1,23 +1,15 @@
 """
-PASO 13. Comparación PAREADA de los experimentos de la ablación en el conjunto dorado.
+Etapa 13. Comparación pareada de los experimentos en el conjunto dorado.
 
-Por qué pareada: todos los experimentos se evalúan sobre los MISMOS 58 estudios. Comparar
-intervalos de confianza separados es conservador (ignora que los errores de dos modelos sobre
-el mismo estudio están correlacionados). El bootstrap pareado remuestrea estudios una sola vez
-por iteración y calcula, sobre esa misma muestra, la diferencia de AUC macro entre cada
-experimento y el de referencia:
+Bootstrap pareado: en cada iteración se remuestrean los estudios una vez y, sobre la misma
+muestra, se calcula delta_b = AUC_macro(exp) - AUC_macro(ref). Se reportan el IC 95 % de
+delta (percentiles 2.5 y 97.5) y p_bilateral = 2 min(P(delta <= 0), P(delta >= 0)).
 
-    delta_b = AUC_macro(exp, muestra_b) - AUC_macro(ref, muestra_b),   b = 1..n
-
-El IC 95 % de delta son los percentiles 2.5 y 97.5. Si el intervalo no contiene 0, la diferencia
-es significativa al 5 %. p_bilateral = 2 * min(P(delta <= 0), P(delta >= 0)).
-
-Salida:  p1_rodilla/reports/tablas/comparacion_pareada.csv
+Salida:
+    p1_rodilla/reports/tablas/comparacion_pareada.csv
 
 Uso:
-    python -m p1_rodilla.scripts.s13_comparacion_pareada
-    (opcional) --ref B_resnet50_bce   experimento de referencia
-               --n 2000               remuestreos bootstrap
+    python -m p1_rodilla.scripts.s13_comparacion_pareada [--ref B_resnet50_bce] [--n 2000]
 """
 from __future__ import annotations
 
@@ -62,7 +54,7 @@ def main() -> None:
     rng = np.random.default_rng(cfg.get("seed", 42))
     deltas = {k: [] for k in preds}
     for _ in range(args.n):
-        idx = rng.integers(0, len(y), len(y))             # misma muestra para todos los modelos
+        idx = rng.integers(0, len(y), len(y))             # muestra común a todos los modelos
         ref = macro_auc(y[idx], preds[args.ref][idx])
         for k, p in preds.items():
             deltas[k].append(macro_auc(y[idx], p[idx]) - ref)

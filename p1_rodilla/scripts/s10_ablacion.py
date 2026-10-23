@@ -1,21 +1,20 @@
 """
-PASO 10. Estudio de ablación (entregables 2 y 4): entrena y evalúa todos los experimentos
-definidos en ablation.experiments del config, uno tras otro, y arma la tabla comparativa.
+Etapa 10. Estudio de ablación.
 
-Cada experimento cambia UNA cosa respecto al de referencia (B_resnet50_bce), para
-poder atribuir la diferencia de resultado a ese factor:
-    A: CNN desde cero vs B: ResNet-50 preentrenada  -> efecto del transfer learning
-    C: pérdida focal vs BCE                         -> manejo del desbalance
-    D: ResNet-18 vs ResNet-50                       -> profundidad del backbone
-    E: ignorar hallazgos no mencionados             -> manejo de etiquetas ruidosas
+Entrena (etapa 7) y evalúa (etapa 8) los experimentos de ``ablation.experiments``; cada uno
+modifica un factor respecto de la referencia B (ResNet-50, BCE):
+    A  codificador desde cero          D  ResNet-18
+    C  pérdida focal                   E  hallazgos no mencionados excluidos de la pérdida
+    F  sobremuestreo de hallazgos poco frecuentes
+
+Salidas:
+    p1_rodilla/reports/tablas/ablacion.csv
+    p1_rodilla/reports/figuras/ablacion_auc.png
 
 Uso:
-    python -m p1_rodilla.scripts.s10_ablacion                 # todos
+    python -m p1_rodilla.scripts.s10_ablacion [--gpu 1]
     python -m p1_rodilla.scripts.s10_ablacion --only A_scratch_bce C_resnet50_focal
-    python -m p1_rodilla.scripts.s10_ablacion --solo-tabla    # solo junta resultados ya hechos
-    (opcional) --gpu 1     para usar la segunda GPU
-
-Salidas: p1_rodilla/reports/tablas/ablacion.csv y p1_rodilla/reports/figuras/ablacion_auc.png
+    python -m p1_rodilla.scripts.s10_ablacion --solo-tabla
 """
 from __future__ import annotations
 
@@ -37,6 +36,7 @@ from common.utils import ensure_dir, get_logger
 
 
 def run(cmd: list[str], env: dict) -> None:
+    """Ejecuta un subproceso desde la raíz del repositorio."""
     print(">>", " ".join(cmd), flush=True)
     subprocess.run(cmd, check=True, cwd=REPO_ROOT, env=env)
 
@@ -46,7 +46,7 @@ def main() -> None:
     ap.add_argument("--config", default=str(REPO_ROOT / "p1_rodilla" / "config.yaml"))
     ap.add_argument("--only", nargs="*", default=None)
     ap.add_argument("--solo-tabla", action="store_true")
-    ap.add_argument("--gpu", default=None, help="índice de GPU a usar (0 o 1)")
+    ap.add_argument("--gpu", default=None, help="índice de la GPU (CUDA_VISIBLE_DEVICES)")
     ap.add_argument("--smoke", action="store_true")
     args = ap.parse_args()
     cfg = load_config(args.config)
@@ -75,7 +75,7 @@ def main() -> None:
             s.update({f"auc_{k}": v for k, v in mg.items() if k != "MACRO"})
             rows.append(s)
     if not rows:
-        log.warning("No hay resultados todavía.")
+        log.warning("Sin resultados de experimentos.")
         return
     df = pd.DataFrame(rows)
     tab = ensure_dir(Path(cfg["data"]["reports_dir"]) / "tablas") / "ablacion.csv"

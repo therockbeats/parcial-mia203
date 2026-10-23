@@ -1,29 +1,15 @@
 """
-Modelos de la Pregunta 1.
+Modelos 2.5D para clasificación multietiqueta de volúmenes.
 
-Arquitectura general (igual para los dos modelos que exige el enunciado):
+Esquema común:
 
-    volumen (B, S, 3, H, W)
-        │  se aplana a (B*S, 3, H, W): cada corte es una imagen
-        ▼
-    ENCODER 2D  ──►  mapa de características (B*S, C, h, w)
-        │  Global Average Pooling (como en GoogLeNet/ResNet)
-        ▼
-    vector por corte (B, S, C)
-        │  AGREGACIÓN de cortes: atención aprendida (MIL), max o promedio
-        ▼
-    vector por estudio (B, C)
-        │  Dropout + capa lineal
-        ▼
-    12 logits  ──►  sigmoide independiente por hallazgo (multietiqueta)
+    volumen (B, S, 3, H, W) -> codificador 2D por corte -> GAP -> (B, S, C)
+    -> agregación de cortes (atención con compuerta, máximo o media) -> (B, C)
+    -> dropout + capa lineal -> K logits (sigmoide independiente por hallazgo)
 
-Modelo A: encoder "ScratchResNet" diseñado e inicializado desde cero (aquí mismo).
-Modelo B: encoder ResNet/EfficientNet de torchvision preentrenado en ImageNet (transfer learning).
-La agregación, la cabeza de 12 salidas y el entrenamiento son implementación propia.
-
-Por qué SIGMOIDE y no softmax: en multietiqueta un estudio puede tener varios hallazgos
-a la vez (p. ej. derrame + rotura de LCA). Softmax obliga a que las probabilidades sumen 1
-(clases excluyentes); 12 sigmoides independientes no.
+Codificadores:
+    ScratchResNet       red residual propia, inicializada desde cero (modelo A)
+    TorchvisionEncoder  ResNet-18/34/50 o EfficientNet-B0 preentrenados en ImageNet (modelo B)
 """
 from __future__ import annotations
 
@@ -33,10 +19,10 @@ import torch.nn.functional as F
 
 
 # ---------------------------------------------------------------------------
-# Modelo A: ResNet pequeña desde cero
+# Codificador propio
 # ---------------------------------------------------------------------------
 class BasicBlock(nn.Module):
-    """Bloque residual básico: y = ReLU( BN(conv(ReLU(BN(conv(x))))) + atajo(x) )."""
+    """Bloque residual básico (He et al., 2016) con proyección 1x1 si cambian las dimensiones."""
 
     def __init__(self, cin: int, cout: int, stride: int = 1):
         super().__init__()
@@ -45,7 +31,7 @@ class BasicBlock(nn.Module):
         self.conv2 = nn.Conv2d(cout, cout, 3, stride=1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(cout)
         self.shortcut = nn.Sequential()
-        if stride != 1 or cin != cout:  # proyección 1x1 cuando cambian dimensiones (opción B de He et al.)
+        if stride != 1 or cin != cout:
             self.shortcut = nn.Sequential(nn.Conv2d(cin, cout, 1, stride=stride, bias=False), nn.BatchNorm2d(cout))
 
     def forward(self, x):
@@ -56,9 +42,9 @@ class BasicBlock(nn.Module):
 
 class ScratchResNet(nn.Module):
     """
-    Encoder 2D propio: stem conv 7x7/2 + maxpool, luego 4 etapas de 2 bloques residuales,
-    duplicando canales y reduciendo a la mitad la resolución en cada etapa (diseño ResNet).
-    Con channels=[32,64,128,256] tiene ~2.8 M parámetros (ResNet-18 tiene 11.7 M).
+    Codificador residual: stem conv 7x7/2 + max pooling y cuatro etapas de dos bloques
+    básicos; cada etapa (salvo la primera) reduce la resolución a la mitad.
+    Con ``channels=(32, 64, 128, 256)`` tiene ~2.8 M parámetros.
     """
 
     def __init__(self, channels=(32, 64, 128, 256)):
@@ -74,18 +60,20 @@ class ScratchResNet(nn.Module):
             cin = c
         self.layers = nn.Sequential(*layers)
         self.out_dim = channels[-1]
-        for m in self.modules():  # inicialización de He (adecuada para ReLU)
+        for m in self.modules():  # inicialización de He
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
 
     def forward_features(self, x):
-        return self.layers(self.stem(x))   # (N, C, h, w)
+        return self.layers(self.stem(x))
 
 
 # ---------------------------------------------------------------------------
-# Modelo B: backbones preentrenados de torchvision
+# Codificadores preentrenados (torchvision)
 # ---------------------------------------------------------------------------
 class TorchvisionEncoder(nn.Module):
+    """Parte convolucional de un modelo de torchvision, sin la capa de clasificación."""
+
     def __init__(self, name: str = "resnet50", pretrained: bool = True):
         super().__init__()
         import torchvision.models as tvm
@@ -115,9 +103,10 @@ class TorchvisionEncoder(nn.Module):
 # ---------------------------------------------------------------------------
 class AttentionPooling(nn.Module):
     """
-    Pooling por atención con compuerta (Ilse et al., 2018, "Attention-based Deep MIL").
-    Aprende un peso a_s >= 0 para cada corte (suman 1) y devuelve sum_s a_s * h_s.
-    Los pesos indican QUÉ cortes usó el modelo: útil para Grad-CAM e interpretación.
+    Agregación por atención con compuerta (Ilse et al., 2018).
+
+    a_s = softmax_s( w^T [tanh(V h_s) * sigmoid(U h_s)] ),  z = sum_s a_s h_s.
+    Devuelve ``z`` (B, C) y los pesos ``a`` (B, S).
     """
 
     def __init__(self, dim: int, hidden: int = 128):
@@ -126,13 +115,15 @@ class AttentionPooling(nn.Module):
         self.U = nn.Linear(dim, hidden)
         self.w = nn.Linear(hidden, 1)
 
-    def forward(self, h):                                  # h: (B, S, C)
-        a = self.w(torch.tanh(self.V(h)) * torch.sigmoid(self.U(h)))  # (B, S, 1)
+    def forward(self, h):
+        a = self.w(torch.tanh(self.V(h)) * torch.sigmoid(self.U(h)))
         a = torch.softmax(a, dim=1)
-        return (a * h).sum(dim=1), a.squeeze(-1)           # (B, C), (B, S)
+        return (a * h).sum(dim=1), a.squeeze(-1)
 
 
 class KneeNet(nn.Module):
+    """Codificador por corte, agregación de cortes y cabeza lineal multietiqueta."""
+
     def __init__(self, encoder: nn.Module, n_labels: int = 12, pooling: str = "attention", dropout: float = 0.3):
         super().__init__()
         self.encoder = encoder
@@ -145,18 +136,19 @@ class KneeNet(nn.Module):
     def forward(self, x, return_attention: bool = False):
         B, S = x.shape[:2]
         fmap = self.encoder.forward_features(x.flatten(0, 1))     # (B*S, C, h, w)
-        feats = fmap.mean(dim=(2, 3)).view(B, S, -1)              # GAP -> (B, S, C)
+        feats = fmap.mean(dim=(2, 3)).view(B, S, -1)              # (B, S, C)
         if self.pooling == "attention":
             study, att = self.attn(feats)
         elif self.pooling == "max":
             study, att = feats.max(dim=1).values, None
         else:
             study, att = feats.mean(dim=1), None
-        logits = self.head(self.drop(study))                      # (B, 12)
+        logits = self.head(self.drop(study))                      # (B, K)
         return (logits, att) if return_attention else logits
 
 
 def build_model(cfg: dict) -> KneeNet:
+    """Modelo según la sección ``model`` del config."""
     m = cfg["model"]
     n_labels = len(cfg["labels"]["names"])
     if m["backbone"] == "scratch":
@@ -167,4 +159,5 @@ def build_model(cfg: dict) -> KneeNet:
 
 
 def count_parameters(model: nn.Module) -> int:
+    """Número de parámetros entrenables."""
     return sum(p.numel() for p in model.parameters() if p.requires_grad)

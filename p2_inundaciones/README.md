@@ -12,5 +12,5 @@ p2_inundaciones/
 ├── notebooks/
 └── reports/           tablas y figuras para el informe
 ```
-Ubicación de los datos: `D:\MIA203\data\p2_sen1floods11\raw\` (subconjunto hand-labeled
-de Sen1Floods11) y la delimitación Copernicus EMSN038 de Lima 2017.
+Datos: `<data_root>/p2_sen1floods11/raw/` (Sen1Floods11) y la delineación Copernicus EMS
+EMSN038 de Lima 2017.

@@ -1,1 +1,1 @@
-"""Paquete Python (este archivo permite importar el módulo)."""
+"""Pregunta 3: detección de fauna en cámaras trampa."""

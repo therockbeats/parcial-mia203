@@ -1,22 +1,11 @@
 """
-Funciones para leer series DICOM de resonancia magnética de rodilla.
+Lectura de series DICOM de RM: metadatos, plano, secuencia y volumen ordenado.
 
-Conceptos clave
----------------
-* Un ESTUDIO (study) es un examen de un paciente. Contiene varias SERIES.
-* Una SERIE es una secuencia de imágenes con el mismo plano y contraste
-  (por ejemplo "SAG PD FS"). Cada archivo .dcm de la serie es un CORTE (instance).
-* El PLANO se deduce de la etiqueta ImageOrientationPatient (IOP): seis números
-  que dan las direcciones de las filas (r) y columnas (c) de la imagen en el espacio
-  del paciente. La normal al corte es n = r × c (producto vectorial):
-      n apunta sobre todo en x  -> plano SAGITAL
-      n apunta sobre todo en y  -> plano CORONAL
-      n apunta sobre todo en z  -> plano AXIAL
-* Los cortes se ORDENAN proyectando ImagePositionPatient (IPP) sobre n.
-  InstanceNumber no es confiable entre centros distintos.
-* "Fat sat" (supresión grasa: FS, SPAIR, STIR...) en secuencias DP/T2 hace que el
-  líquido y el edema brillen: es la secuencia más sensible para derrame, edema óseo,
-  roturas de menisco y ligamentos. Por eso es la preferida.
+* Plano: dirección dominante de la normal n = r x c, con r y c tomados de
+  ImageOrientationPatient (x: sagital, y: coronal, z: axial).
+* Orden de cortes: proyección de ImagePositionPatient sobre n.
+* Secuencia: supresión grasa y ponderación (PD/T2/T1) a partir de SeriesDescription y
+  ScanOptions; si no hay texto, por TR/TE.
 """
 from __future__ import annotations
 
@@ -32,7 +21,7 @@ T1_PATTERN = re.compile(r"(\bt1\b|t1w|_t1|t1_|\bt1.)", re.I)
 
 
 def plane_from_iop(iop) -> str:
-    """Plano anatómico a partir de ImageOrientationPatient (6 números)."""
+    """Plano anatómico (sagittal, coronal, axial) a partir de ImageOrientationPatient."""
     try:
         v = np.asarray([float(x) for x in iop], dtype=float)
         r, c = v[:3], v[3:]
@@ -44,6 +33,7 @@ def plane_from_iop(iop) -> str:
 
 
 def normal_from_iop(iop) -> np.ndarray | None:
+    """Normal unitaria al plano de corte, o None si la orientación no es válida."""
     try:
         v = np.asarray([float(x) for x in iop], dtype=float)
         n = np.cross(v[:3], v[3:])
@@ -54,9 +44,10 @@ def normal_from_iop(iop) -> np.ndarray | None:
 
 def classify_sequence(description: str, scan_options: str = "", tr=None, te=None) -> dict:
     """
-    Clasifica la serie: ¿tiene supresión grasa? ¿es PD, T2 o T1?
-    Usa primero el texto (SeriesDescription/ScanOptions) y, si no alcanza,
-    los tiempos TR/TE (en ms):  T1: TR corto y TE corto; PD: TR largo y TE corto; T2: TE largo.
+    Supresión grasa y ponderación de una serie.
+
+    Se usa el texto de SeriesDescription y ScanOptions; si no identifica la ponderación,
+    se aplican los tiempos (ms): T1 si TR < 900 y TE < 30, T2 si TE >= 60, PD si TR >= 900.
     """
     text = f"{description or ''} {scan_options or ''}"
     fat_sat = bool(FS_PATTERN.search(text)) or "FS" in str(scan_options).upper().split("\\")
@@ -82,11 +73,12 @@ def classify_sequence(description: str, scan_options: str = "", tr=None, te=None
 
 
 def list_dicoms(series_dir: Path, ext: str = ".dcm") -> list[Path]:
+    """Archivos DICOM de una serie, ordenados por nombre."""
     return sorted(p for p in Path(series_dir).iterdir() if p.suffix.lower() == ext)
 
 
 def read_series_header(series_dir: Path, ext: str = ".dcm") -> dict:
-    """Lee la cabecera del corte central de una serie (rápido: sin píxeles)."""
+    """Metadatos de la serie a partir de la cabecera del corte central (sin leer píxeles)."""
     import pydicom
 
     files = list_dicoms(series_dir, ext)
@@ -98,7 +90,7 @@ def read_series_header(series_dir: Path, ext: str = ".dcm") -> dict:
     so = getattr(ds, "ScanOptions", "")
     if isinstance(so, str):
         scan_opt = so
-    else:  # pydicom devuelve una lista (MultiValue) cuando hay varias opciones
+    else:  # MultiValue
         try:
             scan_opt = "\\".join(str(x) for x in so)
         except TypeError:
@@ -126,6 +118,7 @@ def read_series_header(series_dir: Path, ext: str = ".dcm") -> dict:
 
 
 def _f(x):
+    """Conversión a float tolerante a valores ausentes."""
     try:
         return float(x)
     except (TypeError, ValueError):
@@ -134,8 +127,8 @@ def _f(x):
 
 def load_series_volume(series_dir: Path, ext: str = ".dcm") -> np.ndarray:
     """
-    Carga todos los cortes de una serie como un volumen (n_cortes, alto, ancho) en float32,
-    ordenados espacialmente a lo largo de la normal del plano.
+    Volumen (n_cortes, alto, ancho) en float32 con los cortes ordenados a lo largo de la
+    normal al plano. Se descartan los cortes con dimensiones distintas a la mayoritaria.
     """
     import pydicom
 
@@ -144,9 +137,9 @@ def load_series_volume(series_dir: Path, ext: str = ".dcm") -> np.ndarray:
     for f in files:
         ds = pydicom.dcmread(f)
         arr = ds.pixel_array.astype(np.float32)
-        # Escala real de intensidad si existe (RescaleSlope/Intercept)
+        # RescaleSlope / RescaleIntercept
         arr = arr * float(getattr(ds, "RescaleSlope", 1) or 1) + float(getattr(ds, "RescaleIntercept", 0) or 0)
-        if arr.ndim == 3:  # algunos DICOM traen varios cuadros: tomamos el primero
+        if arr.ndim == 3:  # multiframe: primer cuadro
             arr = arr[0]
         n = normal_from_iop(getattr(ds, "ImageOrientationPatient", None))
         ipp = getattr(ds, "ImagePositionPatient", None)
@@ -157,7 +150,6 @@ def load_series_volume(series_dir: Path, ext: str = ".dcm") -> np.ndarray:
         slices.append((key, arr))
     if not slices:
         raise ValueError(f"Serie sin cortes: {series_dir}")
-    # Todos los cortes deben tener el mismo tamaño; si alguno difiere, lo descartamos
     shapes = [s[1].shape for s in slices]
     common = max(set(shapes), key=shapes.count)
     slices = sorted([s for s in slices if s[1].shape == common], key=lambda t: t[0])
@@ -166,10 +158,10 @@ def load_series_volume(series_dir: Path, ext: str = ".dcm") -> np.ndarray:
 
 def normalize_volume(vol: np.ndarray, n_slices: int, size: int, p_low: float, p_high: float) -> np.ndarray:
     """
-    1) Ventana de intensidad por percentiles (robusta a valores extremos) -> rango 0..255.
-    2) Re-muestreo a n_slices cortes uniformemente espaciados.
-    3) Recorte cuadrado central y redimensión a size x size.
-    Devuelve uint8 (n_slices, size, size): 24*256*256 = 1.5 MB por estudio.
+    Normalización de un volumen a uint8 (n_slices, size, size).
+
+    Ventana de intensidad entre los percentiles ``p_low`` y ``p_high``, remuestreo uniforme
+    a ``n_slices`` cortes, recorte cuadrado central y redimensión a ``size`` x ``size``.
     """
     import cv2
 

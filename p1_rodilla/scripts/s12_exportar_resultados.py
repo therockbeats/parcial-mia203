@@ -1,12 +1,11 @@
 """
-PASO 12. Copia los resultados livianos de cada experimento (tablas y figuras) DENTRO del
-repositorio, para versionarlos junto con el código y usarlos en el informe.
+Etapa 12. Exportación de resultados al repositorio.
 
-Copia de <runs_dir>/<exp>/:  metrics_gold.csv, metrics_val.csv, history.csv, summary.json,
-roc_gold.png y gradcam/*.png   ->   p1_rodilla/reports/resultados/<exp>/
-Los pesos (best.pt, cientos de MB) NO se copian: permanecen en runs_dir.
+Copia de ``<runs_dir>/<exp>/`` a ``p1_rodilla/reports/resultados/<exp>/`` las métricas,
+historial, resumen, curvas ROC, registros y mapas Grad-CAM. Los pesos no se copian.
 
-Uso:  python -m p1_rodilla.scripts.s12_exportar_resultados
+Uso:
+    python -m p1_rodilla.scripts.s12_exportar_resultados
 """
 from __future__ import annotations
 

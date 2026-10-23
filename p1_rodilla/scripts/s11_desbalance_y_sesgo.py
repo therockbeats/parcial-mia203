@@ -1,15 +1,18 @@
 """
-PASO 11. Tablas y figuras de desbalance de clases y de sesgo lingüístico (entregables 6 y 7).
+Etapa 11. Desbalance de clases y sesgo lingüístico.
 
-1. Prevalencia de cada hallazgo en el subconjunto usado (train/val) y en el dorado.
-2. Figura de barras de prevalencia (para el informe).
-3. Mitigación evaluada: se compara el experimento de referencia (BCE con pos_weight)
-   con el de pérdida focal (C) y, si existe, con sobremuestreo (F) usando el AUC de los
-   hallazgos más raros (tabla generada a partir de los resultados de la ablación).
-4. Sesgo lingüístico: idioma de los reportes del subconjunto y prevalencia de positivos
-   por idioma (si un idioma casi no produce positivos, probablemente las reglas fallan en él).
+Prevalencia de cada hallazgo por partición (tabla y figura), AUC por hallazgo de los
+experimentos de la ablación ordenado por prevalencia, y porcentaje de positivos de las
+reglas por idioma del reporte.
 
-Uso:  python -m p1_rodilla.scripts.s11_desbalance_y_sesgo
+Salidas:
+    p1_rodilla/reports/tablas/prevalencia_pct.csv
+    p1_rodilla/reports/tablas/auc_por_hallazgo_vs_prevalencia.csv
+    p1_rodilla/reports/tablas/positivos_pct_por_idioma.csv
+    p1_rodilla/reports/figuras/prevalencia.png
+
+Uso:
+    python -m p1_rodilla.scripts.s11_desbalance_y_sesgo
 """
 from __future__ import annotations
 
@@ -51,7 +54,7 @@ def main() -> None:
     plt.savefig(fig_dir / "prevalencia.png", dpi=150)
     plt.close()
 
-    # Mitigación: AUC por hallazgo de los experimentos de la ablación (si ya existen)
+    # AUC por hallazgo de los experimentos de la ablación
     rows = []
     for e in cfg["ablation"]["experiments"]:
         p = Path(cfg["data"]["runs_dir"]) / e["name"] / "metrics_gold.csv"
@@ -64,7 +67,7 @@ def main() -> None:
         comp["prevalencia_train_%"] = (train_prev * 100).round(1)
         comp = comp.sort_values("prevalencia_train_%")
         comp.to_csv(tab_dir / "auc_por_hallazgo_vs_prevalencia.csv")
-        log.info("\nAUC por hallazgo (ordenado de más raro a más común):\n" + comp.to_string())
+        log.info("\nAUC por hallazgo (por prevalencia creciente):\n" + comp.to_string())
 
     # Sesgo lingüístico
     lr = interim / "labels_rules.parquet"

@@ -1,34 +1,31 @@
 # =====================================================================
-#  PREGUNTA 1: Clasificación multietiqueta de anomalías de rodilla (MRI)
-#  Archivo único de configuración. Todos los scripts leen este archivo.
-#  {data_root} y {runs_root} se reemplazan con configs/paths.local.yaml
+#  Pregunta 1: clasificación multietiqueta de anomalías de rodilla en RM
+#  {data_root} y {runs_root} se resuelven con configs/paths.local.yaml;
+#  {repo_root} es la raíz del repositorio.
 # =====================================================================
 
 seed: 42
 
 # ---------------------------------------------------------------------
-# 1. Carpetas de datos (fuera del repositorio)
+# 1. Directorios
 # ---------------------------------------------------------------------
 data:
-  raw_dir: "{data_root}/p1_rsna_knee/raw"            # descarga de Kaggle TAL CUAL
-  interim_dir: "{data_root}/p1_rsna_knee/interim"    # tablas intermedias (parquet/csv)
-  processed_dir: "{data_root}/p1_rsna_knee/processed" # volúmenes .npy listos para entrenar
-  runs_dir: "{runs_root}/p1"                          # checkpoints y resultados
-  reports_dir: "{repo_root}/p1_rodilla/reports"       # tablas y figuras livianas (sí van a GitHub)
+  raw_dir: "{data_root}/p1_rsna_knee/raw"            # datos originales
+  interim_dir: "{data_root}/p1_rsna_knee/interim"    # tablas intermedias
+  processed_dir: "{data_root}/p1_rsna_knee/processed" # volúmenes .npy
+  runs_dir: "{runs_root}/p1"                          # pesos y resultados por experimento
+  reports_dir: "{repo_root}/p1_rodilla/reports"       # tablas y figuras versionadas
 
 # ---------------------------------------------------------------------
-# 2. Esquema de los archivos de Kaggle
-#    Verificado con el inventario real (p1_rodilla/reports/inventario_datos.md, 22/10/2026):
-#    train.csv (4,407 estudios; 58 con las 12 etiquetas doradas 0/1; todos con reporte),
-#    train_series.csv (24,371 series con plano, supresión grasa y sensibilidad a líquido),
-#    imágenes en train_series/<StudyInstanceUID>/<SeriesInstanceUID>/<SOPInstanceUID>.dcm
-#    (DICOM sin compresión, "Explicit VR Little Endian"), 819,635 archivos, 530.6 GB.
+# 2. Esquema del conjunto RSNA Knee Abnormality Detection
+#    train.csv: 4,407 estudios con reporte; 58 con las 12 etiquetas doradas (0/1).
+#    train_series.csv: 24,371 series con plano, supresión grasa y sensibilidad a líquido.
+#    Imágenes: train_series/<StudyInstanceUID>/<SeriesInstanceUID>/<SOPInstanceUID>.dcm
 # ---------------------------------------------------------------------
 schema:
-  studies_csv: "train.csv"        # tabla con un estudio por fila
-  study_col: "StudyInstanceUID"   # columna con el identificador del estudio
-  # Columnas de las 12 etiquetas EN EL MISMO ORDEN que labels.names (más abajo).
-  # Solo 58 filas (las "doradas") tienen valores 0/1; el resto está vacío (NaN).
+  studies_csv: "train.csv"        # un estudio por fila
+  study_col: "StudyInstanceUID"
+  # Columnas de etiqueta, en el mismo orden que labels.names (vacías fuera del conjunto dorado)
   label_cols:
     - "ACL"
     - "MCL"
@@ -42,94 +39,87 @@ schema:
     - "Baker's"
     - "Contusion"
     - "Fracture"
-  # Umbral para convertir la etiqueta dorada en 0/1 (ya viene 0/1; se deja por seguridad)
+  # Umbral de binarización de las etiquetas doradas
   gold_positive_threshold: 0.5
-  # Dónde está el texto de los reportes:
-  #   source: "csv"    -> columna 'col' del archivo 'csv'
-  #   source: "folder" -> un archivo de texto por estudio, patrón 'glob'
+  # Reportes: columna 'col' de 'csv' (source: csv) o un archivo por estudio (source: folder)
   reports:
     source: "csv"
     csv: "train.csv"
     col: "Report"
     glob: "reports/{study_id}.txt"
-  # Tabla oficial de series. Trae el plano y el tipo de secuencia anotados por los
-  # organizadores; son más confiables que la descripción DICOM (algunas series dicen
-  # literalmente "DummySeriesDesc!").
+  # Tabla oficial de series (anotación de plano y secuencia; prevalece sobre la cabecera DICOM)
   series_csv: "train_series.csv"
   series_col: "SeriesInstanceUID"
   series_plane_col: "Anatomical_Plane"     # Sagittal | Coronal | Axial
-  series_fat_sat_col: "Fat_Suppression"    # 1 = con supresión grasa
-  series_fluid_col: "Fluid_Sensitive"      # 1 = secuencia sensible a líquido (PD/T2/STIR)
-  # Carpeta de imágenes: <raw_dir>/<images_subdir>/<study_id>/<series_id>/*.dcm
+  series_fat_sat_col: "Fat_Suppression"    # 1 = supresión grasa
+  series_fluid_col: "Fluid_Sensitive"      # 1 = sensible a líquido (PD/T2/STIR)
+  # Imágenes: <raw_dir>/<images_subdir>/<study_id>/<series_id>/*.dcm
   images_subdir: "train_series"
   dicom_ext: ".dcm"
 
 # ---------------------------------------------------------------------
-# 3. Etiquetas (nombres internos, en este orden en todo el proyecto)
+# 3. Etiquetas
 # ---------------------------------------------------------------------
 labels:
   names:
-    - acl               # lesión de ligamento cruzado anterior (LCA)
-    - mcl               # lesión de ligamento colateral medial
-    - medial_meniscus   # daño de menisco medial
-    - lateral_meniscus  # daño de menisco lateral
-    - medial_oa         # osteoartrosis compartimento medial
-    - lateral_oa        # osteoartrosis compartimento lateral
+    - acl               # lesión del ligamento cruzado anterior
+    - mcl               # lesión del ligamento colateral medial
+    - medial_meniscus   # daño del menisco medial
+    - lateral_meniscus  # daño del menisco lateral
+    - medial_oa         # osteoartrosis del compartimento medial
+    - lateral_oa        # osteoartrosis del compartimento lateral
     - pf_oa             # osteoartrosis patelofemoral
     - effusion          # derrame articular
     - synovitis         # sinovitis
     - baker_cyst        # quiste de Baker
     - bone_contusion    # contusión ósea
     - fracture          # fractura
-  # Fuente de etiquetas débiles para entrenar: "rules", "llm" o "combined"
+  # Fuente de etiquetas débiles: rules | llm | combined
   source: "rules"
-  # Qué hacer con un hallazgo NO mencionado en el reporte:
-  #   "negative" -> se asume ausente (0) con peso weight_unmentioned
-  #   "ignore"   -> no participa en la pérdida (peso 0)
+  # Hallazgo no mencionado: negative (objetivo 0, peso weight_unmentioned) | ignore (peso 0)
   unmentioned_policy: "negative"
   weight_positive: 1.0
   weight_negative: 1.0
-  weight_uncertain: 0.0      # "posible", "no se descarta"... (0 = ignorar)
+  weight_uncertain: 0.0
   weight_unmentioned: 0.5
-  uncertain_as: 1            # si weight_uncertain > 0, valor objetivo para inciertos
-  # Fracción de los estudios dorados usada para el análisis de errores de las reglas
-  # (desarrollo); el resto (reserva) solo se usa para medir el acuerdo de cada versión.
+  uncertain_as: 1            # objetivo de los inciertos si weight_uncertain > 0
+  # Fracción de estudios dorados para el análisis de errores de las reglas (desarrollo);
+  # el resto (reserva) solo se usa para medir el acuerdo.
   gold_dev_fraction: 0.5
 
 # ---------------------------------------------------------------------
-# 4. Extracción de etiquetas con LLM local (paso 4, opcional)
+# 4. Etiquetado con modelo de lenguaje local (etapa 4, opcional)
 # ---------------------------------------------------------------------
 llm:
   host: "http://localhost:11434"   # servidor Ollama local
   model: "qwen2.5:14b-instruct"
   temperature: 0.0
   timeout_s: 120
-  only_subset: true                # true: solo estudios seleccionados + dorados
+  only_subset: true                # solo estudios seleccionados y dorados
 
 # ---------------------------------------------------------------------
 # 5. Selección de series y estudios
 # ---------------------------------------------------------------------
 selection:
-  # Orden de preferencia de la serie a usar por estudio (la primera que exista)
-  # (null = no importa). Se usan las columnas oficiales de train_series.csv.
+  # Preferencia de serie por estudio (se aplica la primera regla con candidatos; null = sin filtro)
   series_priority:
     - {plane: "sagittal", fat_sat: true, fluid_sensitive: true}    # sagital DP/T2 con supresión grasa
-    - {plane: "sagittal", fat_sat: null, fluid_sensitive: true}    # sagital DP/T2 sin supresión
+    - {plane: "sagittal", fat_sat: null, fluid_sensitive: true}    # sagital DP/T2
     - {plane: "sagittal", fat_sat: null, fluid_sensitive: null}    # cualquier sagital
-    - {plane: "coronal", fat_sat: true, fluid_sensitive: true}     # último recurso: coronal DP/T2 FS
+    - {plane: "coronal", fat_sat: true, fluid_sensitive: true}     # coronal DP/T2 con supresión grasa
   min_slices: 12
-  n_studies: 500          # tamaño del subconjunto (recomendado 300-600)
+  n_studies: 500          # tamaño del subconjunto no dorado
   min_pos_per_label: 15   # positivos mínimos por hallazgo en el subconjunto
-  val_fraction: 0.15      # parte del subconjunto para validación interna
-  use_gold_as: "test"     # los ~58 dorados = conjunto de evaluación limpio
+  val_fraction: 0.15      # fracción del subconjunto para validación
+  use_gold_as: "test"     # estudios dorados: solo evaluación
 
 # ---------------------------------------------------------------------
 # 6. Preprocesamiento de volúmenes
 # ---------------------------------------------------------------------
 preprocess:
-  n_slices: 24            # cortes por volumen (re-muestreados uniformemente)
-  size: 256               # alto = ancho tras recorte cuadrado y redimensión
-  p_low: 1.0              # percentiles para la ventana de intensidad
+  n_slices: 24            # cortes por volumen (remuestreo uniforme)
+  size: 256               # lado tras recorte cuadrado y redimensión
+  p_low: 1.0              # percentiles de la ventana de intensidad
   p_high: 99.5
   num_workers: 16         # procesos en paralelo
 
@@ -137,14 +127,13 @@ preprocess:
 # 7. Modelo
 # ---------------------------------------------------------------------
 model:
-  # "scratch"        -> CNN 2D diseñada desde cero (resnet pequeña propia)
-  # "resnet18" | "resnet34" | "resnet50" | "efficientnet_b0" -> preentrenada en ImageNet
+  # scratch (codificador propio) | resnet18 | resnet34 | resnet50 | efficientnet_b0 (ImageNet)
   backbone: "resnet50"
   pretrained: true
   scratch_channels: [32, 64, 128, 256]
-  pooling: "attention"    # cómo se combinan los cortes: attention | max | mean
+  pooling: "attention"    # agregación de cortes: attention | max | mean
   dropout: 0.3
-  slices_in: 16           # cortes que entran al modelo (de los 24 guardados)
+  slices_in: 16           # cortes de entrada por estudio
 
 # ---------------------------------------------------------------------
 # 8. Entrenamiento
@@ -152,15 +141,15 @@ model:
 train:
   epochs: 25
   batch_size: 8
-  lr: 3.0e-4              # backbone preentrenado: 1e-4 a 3e-4; scratch: 1e-3
+  lr: 3.0e-4
   weight_decay: 1.0e-4
   warmup_epochs: 1
-  loss: "bce"             # "bce" | "focal"
+  loss: "bce"             # bce | focal
   focal_gamma: 2.0
-  pos_weight: "auto"      # "auto" (negativos/positivos, recortado) | "none"
+  pos_weight: "auto"      # auto (negativos/positivos, acotado) | none
   pos_weight_max: 10.0
-  sampler: "none"         # "none" | "oversample_rare"
-  amp: true               # precisión mixta bf16 en CUDA
+  sampler: "none"         # none | oversample_rare
+  amp: true               # bf16 en CUDA
   grad_clip: 1.0
   num_workers: 8
   early_stopping_patience: 6
@@ -170,14 +159,14 @@ train:
 # 9. Evaluación e interpretabilidad
 # ---------------------------------------------------------------------
 eval:
-  threshold_strategy: "max_f1_val"   # umbral por hallazgo elegido en validación
+  threshold_strategy: "max_f1_val"   # umbral por hallazgo: máximo F1 en validación
   bootstrap: 1000
 gradcam:
   findings: ["acl", "medial_meniscus", "effusion", "bone_contusion"]
   n_cases: 3
 
 # ---------------------------------------------------------------------
-# 10. Ablación (paso 10). Cada experimento = nombre + cambios al config
+# 10. Ablación: nombre del experimento y overrides respecto del config base
 # ---------------------------------------------------------------------
 ablation:
   experiments:

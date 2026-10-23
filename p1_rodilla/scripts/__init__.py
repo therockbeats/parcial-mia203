@@ -1,1 +1,1 @@
-"""Paquete Python (este archivo permite importar el módulo)."""
+"""Etapas ejecutables del pipeline de la Pregunta 1."""

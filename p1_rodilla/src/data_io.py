@@ -1,9 +1,4 @@
-"""
-Lectura de las tablas de Kaggle según la sección `schema` del config.
-
-Todas las demás partes del proyecto usan estas funciones, así que si Kaggle
-cambia un nombre de columna solo hay que corregir el config, no el código.
-"""
+"""Lectura de las tablas del conjunto RSNA según la sección ``schema`` del config."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -19,7 +14,7 @@ def _read_table(path: Path) -> pd.DataFrame:
 
 
 def load_studies(cfg: dict) -> pd.DataFrame:
-    """Tabla de estudios con la columna study_id normalizada a texto."""
+    """Tabla de estudios con el identificador normalizado como ``study_id`` (texto)."""
     sch = cfg["schema"]
     df = _read_table(Path(cfg["data"]["raw_dir"]) / sch["studies_csv"])
     df = df.rename(columns={sch["study_col"]: "study_id"})
@@ -29,15 +24,17 @@ def load_studies(cfg: dict) -> pd.DataFrame:
 
 def load_gold(cfg: dict) -> pd.DataFrame:
     """
-    Devuelve SOLO los estudios con etiqueta dorada (todas las columnas de etiqueta con valor),
-    con columnas renombradas a los nombres internos (labels.names) y valores 0/1.
+    Estudios con etiqueta dorada completa.
+
+    Devuelve ``study_id`` y una columna binaria por hallazgo, con los nombres internos
+    de ``labels.names``.
     """
     sch, names = cfg["schema"], cfg["labels"]["names"]
     df = load_studies(cfg)
     missing = [c for c in sch["label_cols"] if c not in df.columns]
     if missing:
         raise KeyError(f"Columnas de etiqueta no encontradas en {sch['studies_csv']}: {missing}. "
-                       "Corrige schema.label_cols en config.yaml según el inventario.")
+                       "Revisar schema.label_cols en config.yaml.")
     gold = df[["study_id"] + list(sch["label_cols"])].dropna(subset=sch["label_cols"], how="any").copy()
     gold.columns = ["study_id"] + list(names)
     thr = float(sch.get("gold_positive_threshold", 0.5))
@@ -47,7 +44,7 @@ def load_gold(cfg: dict) -> pd.DataFrame:
 
 
 def load_reports(cfg: dict) -> pd.DataFrame:
-    """Tabla study_id, report (texto libre del reporte radiológico)."""
+    """Tabla ``study_id``, ``report`` con los reportes no vacíos."""
     rep = cfg["schema"]["reports"]
     raw = Path(cfg["data"]["raw_dir"])
     if rep["source"] == "csv":
@@ -70,4 +67,5 @@ def load_reports(cfg: dict) -> pd.DataFrame:
 
 
 def label_matrix(df: pd.DataFrame, names: list[str]) -> np.ndarray:
+    """Matriz (n_estudios, n_hallazgos) en float32."""
     return df[names].to_numpy(dtype=np.float32)

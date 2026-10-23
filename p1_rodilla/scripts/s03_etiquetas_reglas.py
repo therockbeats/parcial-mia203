@@ -1,25 +1,23 @@
 """
-PASO 3. Etiquetas débiles con REGLAS multilingües (entregable 1 del enunciado).
+Etapa 3. Etiquetas débiles por reglas y acuerdo con las etiquetas doradas.
 
-1. Lee todos los reportes (texto libre) de los estudios de entrenamiento.
-2. Detecta el idioma de cada reporte (para el análisis de sesgo lingüístico).
-3. Aplica las reglas de p1_rodilla/src/labels_rules.py -> código por hallazgo:
-       1 positivo, 0 negativo, 2 incierto, -1 no mencionado
-4. Compara contra los estudios con etiqueta dorada: acuerdo, kappa, sensibilidad,
-   especificidad y tasa de ruido estimada (1 - acuerdo), global y por idioma.
-5. Particiona los estudios dorados en DESARROLLO y RESERVA (labels.gold_dev_fraction).
-   El análisis de errores para refinar las reglas usa solo DESARROLLO; el acuerdo en
-   RESERVA es la estimación no sesgada de la calidad de cada versión de las reglas.
+Aplica ``labels_rules.extract_labels`` a todos los reportes, detecta su idioma y mide el
+acuerdo con las etiquetas doradas (acuerdo, kappa de Cohen, sensibilidad, especificidad),
+global, por idioma y en las particiones fijas de desarrollo y reserva de los estudios dorados.
+Cada ejecución registra la versión de las reglas en un historial.
 
 Salidas:
     <interim_dir>/labels_rules.parquet
-    p1_rodilla/reports/tablas/acuerdo_reglas_vs_dorado.csv
-    p1_rodilla/reports/tablas/acuerdo_reglas_por_idioma.csv
-    p1_rodilla/reports/tablas/idiomas.csv
-    p1_rodilla/reports/tablas/acuerdo_reglas_historial.csv   (una fila por versión de reglas)
     <interim_dir>/gold_particion.csv
+    p1_rodilla/reports/tablas/distribucion_etiquetas_reglas.csv
+    p1_rodilla/reports/tablas/idiomas.csv
+    p1_rodilla/reports/tablas/acuerdo_reglas_vs_dorado.csv
+    p1_rodilla/reports/tablas/acuerdo_reglas_{desarrollo,reserva}.csv
+    p1_rodilla/reports/tablas/acuerdo_reglas_por_idioma.csv
+    p1_rodilla/reports/tablas/acuerdo_reglas_historial.csv
 
-Uso:  python -m p1_rodilla.scripts.s03_etiquetas_reglas --version v1
+Uso:
+    python -m p1_rodilla.scripts.s03_etiquetas_reglas --version v3
 """
 from __future__ import annotations
 
@@ -41,8 +39,9 @@ from p1_rodilla.src.labels_rules import LABELS, STATUS_NAME, detect_language, ex
 
 def gold_partition(gold: pd.DataFrame, cfg: dict, log) -> pd.DataFrame:
     """
-    Divide los estudios dorados en 'desarrollo' y 'reserva' de forma determinista (semilla del
-    config). La partición se guarda y se reutiliza para que no cambie entre versiones de reglas.
+    Partición determinista de los estudios dorados en ``desarrollo`` y ``reserva``.
+
+    Se guarda en ``gold_particion.csv`` y se reutiliza mientras el conjunto dorado no cambie.
     """
     path = ensure_dir(cfg["data"]["interim_dir"]) / "gold_particion.csv"
     if path.exists():
@@ -86,24 +85,24 @@ def main() -> None:
     log.info(f"Guardado {out}")
 
     tab_dir = ensure_dir(Path(cfg["data"]["reports_dir"]) / "tablas")
-    # Distribución de estados por hallazgo (cuántos positivos/negativos/... encontró la regla)
+    # Distribución de estados por hallazgo
     dist = pd.DataFrame({n: weak[n].map(STATUS_NAME).value_counts() for n in names}).T.fillna(0).astype(int)
     dist.to_csv(tab_dir / "distribucion_etiquetas_reglas.csv")
     log.info("\nDistribución de etiquetas débiles:\n" + dist.to_string())
     weak["language"].value_counts().rename_axis("idioma").reset_index(name="reportes").to_csv(tab_dir / "idiomas.csv", index=False)
 
-    # Acuerdo con etiquetas doradas
+    # Acuerdo con las etiquetas doradas
     try:
         gold = load_gold(cfg)
     except KeyError as e:
-        log.warning(f"No pude cargar las etiquetas doradas: {e}")
+        log.warning(f"No se pudieron cargar las etiquetas doradas: {e}")
         return
     log.info(f"{len(gold)} estudios con etiqueta dorada")
     agr = agreement_report(weak, gold, names)
     agr.to_csv(tab_dir / "acuerdo_reglas_vs_dorado.csv", index=False)
     log.info("\nAcuerdo reglas vs dorado:\n" + agr.round(3).to_string(index=False))
 
-    # Partición fija de los dorados: DESARROLLO (análisis de errores) y RESERVA (estimación final)
+    # Acuerdo por partición de los dorados (desarrollo / reserva)
     part = gold_partition(gold, cfg, log)
     by_part = {}
     for name in ("desarrollo", "reserva"):
@@ -129,7 +128,7 @@ def main() -> None:
     log.info("\nHistorial de versiones (kappa promedio):\n"
              + hist[["version", "kappa_desarrollo", "kappa_reserva", "acuerdo_desarrollo", "acuerdo_reserva"]].round(3).to_string(index=False))
 
-    # Acuerdo por idioma (para la discusión de sesgo geográfico/lingüístico)
+    # Acuerdo por idioma
     m = gold.merge(weak[["study_id", "language"]], on="study_id")
     per_lang = []
     for lang, g in m.groupby("language"):

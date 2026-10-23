@@ -1,6 +1,4 @@
-"""
-Utilidades generales: semillas, dispositivo (CUDA / MPS / CPU), registro de mensajes.
-"""
+"""Semillas, selección de dispositivo, registro y utilidades de archivos."""
 from __future__ import annotations
 
 import logging
@@ -14,10 +12,7 @@ import numpy as np
 
 
 def set_seed(seed: int = 42) -> None:
-    """
-    Fija las semillas aleatorias para que los experimentos sean reproducibles.
-    (Python, NumPy y PyTorch tienen cada uno su propio generador aleatorio.)
-    """
+    """Fija las semillas de Python, NumPy y PyTorch."""
     random.seed(seed)
     np.random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
@@ -31,13 +26,7 @@ def set_seed(seed: int = 42) -> None:
 
 
 def get_device(prefer: str = "auto"):
-    """
-    Elige dónde se ejecutan los cálculos:
-      - "cuda": GPU NVIDIA (workstation Windows)
-      - "mps":  GPU de Apple Silicon (MacBook)
-      - "cpu":  procesador (último recurso)
-    Con prefer="auto" se elige el mejor disponible.
-    """
+    """Devuelve el dispositivo de cómputo; con ``prefer="auto"`` prioriza CUDA, luego MPS y CPU."""
     import torch
 
     if prefer != "auto":
@@ -50,9 +39,9 @@ def get_device(prefer: str = "auto"):
 
 
 def get_logger(name: str, log_file: str | Path | None = None) -> logging.Logger:
-    """Logger que escribe en pantalla y (opcionalmente) en un archivo .log."""
+    """Logger con salida a consola y, opcionalmente, a archivo."""
     logger = logging.getLogger(name)
-    if logger.handlers:  # evita duplicar mensajes si se llama dos veces
+    if logger.handlers:
         return logger
     logger.setLevel(logging.INFO)
     fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s", "%H:%M:%S")
@@ -68,7 +57,7 @@ def get_logger(name: str, log_file: str | Path | None = None) -> logging.Logger:
 
 
 class Timer:
-    """Cronómetro simple:  with Timer('paso') : ...  imprime cuánto tardó."""
+    """Context manager que registra el tiempo transcurrido de un bloque."""
 
     def __init__(self, label: str, logger: logging.Logger | None = None):
         self.label, self.logger = label, logger
@@ -84,7 +73,7 @@ class Timer:
 
 
 def ensure_dir(path: str | Path) -> Path:
-    """Crea la carpeta (y sus padres) si no existe y la devuelve como Path."""
+    """Crea el directorio si no existe y lo devuelve como ``Path``."""
     p = Path(path)
     p.mkdir(parents=True, exist_ok=True)
     return p

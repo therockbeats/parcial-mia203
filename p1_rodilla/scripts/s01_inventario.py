@@ -1,21 +1,16 @@
 """
-PASO 1. Inventario de la descarga de Kaggle (RSNA Knee Abnormality Detection).
+Etapa 1. Inventario de los datos crudos.
 
-Objetivo: saber EXACTAMENTE qué trae la descarga antes de escribir nada más:
-nombres de archivos, columnas de cada CSV, cómo están organizadas las carpetas
-de DICOM y qué metadatos traen las imágenes.
+Recorre la descarga y resume: archivos por extensión y nivel de carpetas, esquema de las
+tablas (columnas, tipos, nulos, ejemplos) y una muestra de cabeceras DICOM con prueba de
+decodificación de píxeles. Los textos se truncan a 160 caracteres.
 
-Genera dos archivos DENTRO del repositorio (son pequeños, se suben a GitHub):
-    p1_rodilla/reports/inventario_datos.md    <- legible para humanos
-    p1_rodilla/reports/inventario_datos.json  <- el mismo contenido para programas
-Con ese reporte se ajusta la sección "schema" de p1_rodilla/config.yaml.
+Salidas:
+    p1_rodilla/reports/inventario_datos.md
+    p1_rodilla/reports/inventario_datos.json
 
-Uso (desde la raíz del repositorio):
-    python -m p1_rodilla.scripts.s01_inventario
-Opcional:  --max-dicom 40   (cuántas series muestrear para leer cabeceras)
-
-Nota de privacidad: el reporte recorta los textos a 160 caracteres. Mantén el
-repositorio de GitHub en modo PRIVADO hasta la entrega (reglas de Kaggle).
+Uso:
+    python -m p1_rodilla.scripts.s01_inventario [--max-dicom 40]
 """
 from __future__ import annotations
 
@@ -43,18 +38,15 @@ DICOM_TAGS = [
 
 
 def short(value, n: int = 160) -> str:
-    """Convierte cualquier valor a texto de máximo n caracteres (para el reporte)."""
+    """Representación textual truncada a ``n`` caracteres."""
     s = str(value).replace("\n", " ").replace("|", "/")
     return s if len(s) <= n else s[:n] + "…"
 
 
 def walk_tree(root: Path, log) -> dict:
     """
-    Recorre TODA la carpeta una sola vez y cuenta:
-      - archivos por extensión,
-      - cuántas carpetas hay en cada nivel de profundidad,
-      - ejemplos de rutas de archivos por nivel (para deducir el patrón de carpetas).
-    os.scandir es mucho más rápido que glob para ~800 mil archivos.
+    Recorrido único del árbol (``os.scandir``): archivos y bytes por extensión, carpetas y
+    archivos por nivel de profundidad y rutas de ejemplo por nivel.
     """
     ext_count, ext_bytes = Counter(), Counter()
     dirs_per_depth = Counter()
@@ -100,7 +92,7 @@ def walk_tree(root: Path, log) -> dict:
 
 
 def describe_table(path: Path) -> dict:
-    """Lee un CSV/Parquet y resume columnas, tipos, nulos y ejemplos."""
+    """Resumen de una tabla: columnas, tipos, nulos, valores únicos, rango y ejemplos."""
     if path.suffix.lower() == ".parquet":
         df = pd.read_parquet(path)
     elif path.suffix.lower() == ".tsv":
@@ -127,7 +119,7 @@ def describe_table(path: Path) -> dict:
 
 
 def find_series_dirs(images_root: Path, ext: str, limit: int, seed: int = 0) -> list[Path]:
-    """Busca carpetas que contienen archivos DICOM (hasta 'limit', elegidas al azar)."""
+    """Muestra aleatoria de hasta ``limit`` carpetas que contienen archivos DICOM."""
     candidates = []
     for dirpath, _, filenames in os.walk(images_root):
         if any(f.lower().endswith(ext) for f in filenames):
@@ -139,7 +131,7 @@ def find_series_dirs(images_root: Path, ext: str, limit: int, seed: int = 0) -> 
 
 
 def read_dicom_sample(series_dirs: list[Path], ext: str, images_root: Path) -> list[dict]:
-    """Lee la cabecera (sin píxeles) del corte central de cada serie y prueba decodificar uno."""
+    """Cabecera del corte central de cada serie y prueba de decodificación en las dos primeras."""
     import pydicom
 
     rows = []
@@ -159,7 +151,6 @@ def read_dicom_sample(series_dirs: list[Path], ext: str, images_root: Path) -> l
         except Exception as e:
             row["error_cabecera"] = short(e)
         rows.append(row)
-    # Prueba de decodificación de píxeles en las dos primeras series
     for row, sd in zip(rows[:2], series_dirs[:2]):
         try:
             files = sorted(f for f in sd.iterdir() if f.suffix.lower() == ext)
@@ -171,7 +162,7 @@ def read_dicom_sample(series_dirs: list[Path], ext: str, images_root: Path) -> l
 
 
 def to_markdown(inv: dict) -> str:
-    """Arma el reporte legible en Markdown."""
+    """Reporte del inventario en Markdown."""
     L = ["# Inventario de datos: RSNA Knee Abnormality Detection", ""]
     L.append(f"Carpeta analizada: `{inv['raw_dir']}`  ")
     t = inv["arbol"]
@@ -222,15 +213,14 @@ def main() -> None:
     log = get_logger("s01")
     raw = Path(cfg["data"]["raw_dir"])
     if not raw.exists():
-        raise SystemExit(f"No existe {raw}. Revisa data_root en configs/paths.local.yaml")
+        raise SystemExit(f"No existe {raw} (revisar data_root en configs/paths.local.yaml)")
 
     inv = {"raw_dir": str(raw)}
     with Timer("Recorrido de carpetas", log):
         inv["arbol"] = walk_tree(raw, log)
 
-    # Tablas: todo CSV/Parquet/JSON en los dos primeros niveles
+    # Tablas en los dos primeros niveles (excluida la carpeta de imágenes)
     inv["tablas"] = []
-    # Solo nivel 1 y 2 (las tablas de Kaggle están arriba; no recorremos los 800 mil DICOM otra vez)
     level1 = [p for p in raw.iterdir()]
     level2 = [q for p in level1 if p.is_dir() and p.name != cfg["schema"].get("images_subdir")
               for q in p.iterdir()]
@@ -242,10 +232,10 @@ def main() -> None:
             except Exception as e:
                 inv["tablas"].append({"archivo": str(p), "error": short(e)})
 
-    # DICOM: carpeta de imágenes indicada en el config (o toda la descarga si no existe)
+    # Muestra de DICOM en la carpeta de imágenes del config (o en toda la descarga)
     images_root = raw / cfg["schema"].get("images_subdir", "")
     if not images_root.exists():
-        log.warning(f"No existe {images_root}; busco DICOM en toda la descarga")
+        log.warning(f"No existe {images_root}; se buscan DICOM en toda la descarga")
         images_root = raw
     ext = cfg["schema"].get("dicom_ext", ".dcm").lower()
     with Timer("Muestreo de cabeceras DICOM", log):
@@ -256,7 +246,7 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "inventario_datos.json").write_text(json.dumps(inv, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
     (out_dir / "inventario_datos.md").write_text(to_markdown(inv), encoding="utf-8")
-    log.info(f"Listo. Revisa {out_dir / 'inventario_datos.md'}")
+    log.info(f"Inventario guardado en {out_dir / 'inventario_datos.md'}")
 
 
 if __name__ == "__main__":

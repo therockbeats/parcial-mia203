@@ -1,8 +1,4 @@
-"""
-Utilidades comunes para etiquetas débiles:
-  * convertir los códigos (1, 0, 2, -1) en objetivos y pesos para la pérdida,
-  * medir el acuerdo de las etiquetas débiles con las etiquetas doradas.
-"""
+"""Conversión de estados de etiqueta en objetivos y pesos, y acuerdo con las etiquetas doradas."""
 from __future__ import annotations
 
 import numpy as np
@@ -13,9 +9,9 @@ from .labels_rules import NEG, NM, POS, UNC
 
 def to_targets(codes: pd.DataFrame, names: list[str], lab_cfg: dict) -> tuple[np.ndarray, np.ndarray]:
     """
-    Convierte códigos de estado en:
-      y (objetivo 0/1) y w (peso de cada etiqueta en la pérdida).
-    Un peso 0 significa "esta etiqueta de este estudio no participa en el entrenamiento".
+    Objetivos ``y`` y pesos ``w`` a partir de los estados (POS, NEG, UNC, NM).
+
+    Los pesos se toman de la sección ``labels`` del config; ``w = 0`` excluye la etiqueta.
     """
     c = codes[names].to_numpy()
     y = np.zeros_like(c, dtype=np.float32)
@@ -25,18 +21,18 @@ def to_targets(codes: pd.DataFrame, names: list[str], lab_cfg: dict) -> tuple[np
     y[c == UNC], w[c == UNC] = float(lab_cfg.get("uncertain_as", 1)), lab_cfg.get("weight_uncertain", 0.0)
     if lab_cfg.get("unmentioned_policy", "negative") == "negative":
         y[c == NM], w[c == NM] = 0.0, lab_cfg.get("weight_unmentioned", 0.5)
-    else:  # "ignore"
+    else:
         y[c == NM], w[c == NM] = 0.0, 0.0
     return y, w
 
 
 def agreement_report(weak: pd.DataFrame, gold: pd.DataFrame, names: list[str]) -> pd.DataFrame:
     """
-    Compara etiquetas débiles contra doradas en los estudios que tienen ambas.
-    Para comparar, la etiqueta débil se binariza: positivo=1; incierto=1; negativo/no mencionado=0.
-    Reporta por hallazgo: n, acuerdo (exactitud), kappa de Cohen, sensibilidad, especificidad,
-    y cuántas veces el hallazgo no se mencionó en el reporte.
-    La "tasa de ruido" estimada es 1 - acuerdo.
+    Acuerdo entre etiquetas débiles y doradas por hallazgo.
+
+    La etiqueta débil se binariza como positiva si es POS o UNC. Se reportan acuerdo,
+    kappa de Cohen, sensibilidad, especificidad y conteos de estados no mencionados e
+    inciertos, más una fila PROMEDIO. El ruido estimado es 1 - acuerdo.
     """
     from sklearn.metrics import cohen_kappa_score
 

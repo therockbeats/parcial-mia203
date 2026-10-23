@@ -1,39 +1,26 @@
 """
-Extracción de etiquetas DÉBILES a partir del texto libre de los reportes radiológicos
-(reglas y palabras clave multilingües).
+Extracción de etiquetas débiles a partir de reportes radiológicos multilingües (reglas).
 
-Por qué "débiles": las etiquetas no las puso un radiólogo para este estudio de IA;
-se deducen automáticamente del texto, así que tienen ruido (errores). La calidad se
-mide comparando contra los ~58 estudios con etiqueta dorada (ver agreement_report).
+Procedimiento
+-------------
+1. Normalización: minúsculas, sin diacríticos y sin secciones de antecedentes o indicación.
+2. Segmentación en cláusulas por puntuación y conectores de contraste.
+3. Búsqueda de términos por hallazgo en en, es, de, tr, el, ru, bg, hr/bs/sr, fr y nl.
+4. Estado de cada cláusula, en orden de prioridad: incierto, negado (tras eliminar falsas
+   negaciones), normal sin lesión (negativo) y positivo.
+5. Combinación por estudio: POS > UNC > NEG; sin menciones, NM.
 
-Funcionamiento
------------------------------------------------------------
-1. Normalizar el texto: minúsculas y sin tildes  ("Rotura del LCA" -> "rotura del lca").
-2. Partir el reporte en CLÁUSULAS (por punto, punto y coma, salto de línea y palabras de
-   contraste como "pero"). La negación casi siempre vive dentro de la misma cláusula.
-3. Para cada hallazgo buscar sus términos en cada cláusula, en ~10 idiomas
-   (inglés, español, alemán, turco, griego, ruso, croata/bosnio/serbio, francés, neerlandés).
-4. Decidir el estado de la cláusula, en este orden de prioridad:
-      incertidumbre ("posible", "no se descarta", "Verdacht")  -> INCIERTO
-      negación ("sin", "no", "kein", "yok", "нет")              -> NEGATIVO
-      término de "normal/íntegro" sin lesión                     -> NEGATIVO
-      en otro caso                                               -> POSITIVO
-5. Combinar cláusulas: si alguna es POSITIVO -> POSITIVO; si no, INCIERTO; si no, NEGATIVO;
-   si el hallazgo nunca aparece -> NO MENCIONADO.
+Reglas de gravedad
+------------------
+* Ligamentos: esguince grado 1, señal intersticial o degeneración mucoide sin rotura completa: NEG.
+* Meniscos: degeneración o señal grado 1-2 (Stoller) sin rotura explícita: UNC.
+* Artrosis: positiva si se declara explícitamente (OA, artrosis, pinzamiento); la condropatía
+  o los osteofitos aislados solo si el grado es alto.
+* Derrame: leve, mínimo o escaso sin calificativo de moderado o abundante: NEG.
+* Contusión: el edema óseo sin el término "contusión" solo con contexto traumático.
+* Sinovitis: edema de la grasa de Hoffa como indicador (Hoffa-sinovitis, MOAKS).
 
-Reglas de gravedad (versiones 2 y 3, a partir del análisis de errores en los dorados de desarrollo):
-   * Ligamentos: esguince grado 1, señal intersticial o degeneración mucoide sin rotura -> NEGATIVO.
-   * Meniscos: degeneración o señal grado 1-2 (Stoller) sin rotura explícita -> INCIERTO
-     (versión 3: en la v2 era NEGATIVO y empeoró el acuerdo en la partición de reserva).
-   * Artrosis: positiva si se declara explícitamente (OA, artrosis, pinzamiento); la condropatía
-     o los osteofitos aislados solo cuentan si el grado es alto (grado 3-4, espesor total).
-   * Derrame: escaso, leve o mínimo sin calificativo de moderado/abundante -> NEGATIVO.
-   * Contusión: el edema óseo sin la palabra "contusión" solo cuenta con contexto traumático.
-   * Sinovitis: el edema de la grasa de Hoffa se toma como indicador (Hoffa-sinovitis, MOAKS).
-   * Se ignoran las secciones de antecedentes o indicación clínica.
-
-Códigos usados en todo el proyecto:
-    POS = 1, NEG = 0, UNC = 2 (incierto), NM = -1 (no mencionado)
+Códigos de estado: POS = 1, NEG = 0, UNC = 2 (incierto), NM = -1 (no mencionado).
 """
 from __future__ import annotations
 
@@ -45,13 +32,12 @@ STATUS_NAME = {POS: "positivo", NEG: "negativo", UNC: "incierto", NM: "no_mencio
 
 
 def strip_accents(text: str) -> str:
-    """Quita tildes y diacríticos: 'lesión' -> 'lesion', 'ρήξη' -> 'ρηξη', 'läsion' -> 'lasion'."""
+    """Elimina diacríticos (p. ej., 'lesión' -> 'lesion', 'ρήξη' -> 'ρηξη')."""
     nfkd = unicodedata.normalize("NFKD", text)
     return "".join(ch for ch in nfkd if not unicodedata.combining(ch))
 
 
-# Encabezados de antecedentes o indicación clínica: su contenido describe la sospecha previa
-# al estudio, no un hallazgo de la resonancia ("Antecedentes clínicos: Artrosis").
+# Encabezados de antecedentes o indicación clínica; su contenido no describe hallazgos del estudio.
 CLINICAL_HEADER = re.compile(
     r"(antecedentes clinicos|antecedentes|indicacion clinica|clinical (history|information|indication)|indication|"
     r"history|anamnese|klinische angaben|fragestellung|klinische inlichtingen|diagnostische vraagstelling|"
@@ -60,6 +46,7 @@ CLINICAL_HEADER = re.compile(
 
 
 def normalize(text: str) -> str:
+    """Minúsculas, sin diacríticos, sin secciones clínicas previas y con espacios simples."""
     text = strip_accents(text.casefold())
     text = text.replace("ı", "i").replace("œ", "oe").replace("ß", "ss")
     text = CLINICAL_HEADER.sub(" ", text)
@@ -67,7 +54,7 @@ def normalize(text: str) -> str:
 
 
 def rx(*parts: str) -> re.Pattern:
-    """Compila una expresión regular a partir de varias alternativas (ya sin tildes)."""
+    """Compila la disyunción de patrones, sin diacríticos."""
     return re.compile("|".join(strip_accents(p) for p in parts))
 
 
@@ -120,8 +107,7 @@ LESION = rx(
 )
 DEGENERATION = rx(r"degenera", r"dejenera", r"εκφυλ", r"дегенерат", r"degenerescence", r"degeneratie", r"mukoid", r"mucoid",
                   r"meniskopati", r"мукоидн")
-# Grados 1-2 de señal meniscal (Stoller): alteración intrasustancia que no alcanza la superficie
-# articular; por definición no es una rotura.
+# Señal meniscal de grado 1-2 (Stoller): alteración intrasustancia sin extensión a la superficie.
 MENISCAL_LOW_GRADE = rx(r"grad\w* (i|ii|1|2)[ab]?\b", r"\b(i|ii|1|2)[ab]? (stepen|степен|derece)", r"стадий", r"\b2[abаб]\b",
                         r"степен 2", r"\bii[abаб]\b")
 TEAR = rx(r"\btear", r"\btorn\b", r"ruptur", r"desgarr", r"rotura", r"\briss\b", r"y[i]rt[i][kg]", r"ρηξη", r"разрыв",
@@ -129,8 +115,7 @@ TEAR = rx(r"\btear", r"\btorn\b", r"ruptur", r"desgarr", r"rotura", r"\briss\b",
 # Lesión ligamentaria de bajo grado (esguince grado 1, señal intersticial, degeneración mucoide)
 LIGAMENT_LOW_GRADE = rx(r"grad\w* (1|i)\b", r"\b(1|i) (stepen|степен|derece)", r"interstiti", r"intersticial",
                         r"mucoid", r"mukoid", r"мукоидн")
-# "Falsas negaciones": contienen 'no/sin/nicht' pero NO niegan el hallazgo.
-# Se borran de la cláusula antes de buscar negaciones.
+# Falsas negaciones ("no desplazada", "sin cambios"): se eliminan antes de buscar negaciones.
 PSEUDO_NEGATION = rx(
     r"\bno desplazad\w*", r"non[- ]?displac\w*", r"undisplaced", r"nicht disloz\w*", r"nicht verschoben",
     r"sin cambios\w*", r"no (significant )?change\w*", r"unchanged", r"keine (wesentliche )?anderung\w*",
@@ -152,7 +137,7 @@ ANATOMY = {
 }
 MEDIAL = rx(r"medial", r"intern", r"innen", r"\bic\b", r"\bεσω", r"медиал", r"внутренн", r"medijaln", r"mediaal")
 LATERAL = rx(r"lateral", r"extern", r"aussen", r"\bdis\b", r"\bεξω", r"латерал", r"наружн", r"lateraln", r"lateraal")
-# "Faceta medial/lateral de la rótula" pertenece al compartimento patelofemoral, no al femorotibial
+# Lateralidad de estructuras patelofemorales: no se asigna a los compartimentos femorotibiales
 PATELLAR_SIDE = rx(r"(medial|lateral)\w* (patellar )?facet\w*", r"faceta (medial|lateral|interna|externa)\w*",
                    r"(medial|lateral)\w* (patell|retinac)\w*", r"(medial|lateral)\w* patellafacet\w*")
 PF = rx(r"patell", r"femoropatel", r"patelofemor", r"rotul", r"retropatell", r"kniescheib", r"επιγονατιδ", r"πατελ",
@@ -185,16 +170,15 @@ SIMPLE = {
     "fracture": rx(r"fractur", r"fraktur", r"k[i]r[i]k", r"καταγμ", r"перелом", r"фрактур", r"prijelom", r"prelom", r"fractuur",
                    r"\bbreuk", r"avulsion", r"knochern\w* ausriss", r"avulsion osea", r"segond", r"subchondral\w* impression"),
 }
-# Edema de médula ósea sin la palabra "contusión": solo es positivo con contexto traumático;
-# sin él es inespecífico (sobrecarga, artrosis, fractura por insuficiencia) y queda incierto.
+# Edema de médula ósea: inespecífico salvo contexto traumático.
 MARROW_EDEMA = rx(r"marrow (o)?edema", r"knochenmark\w*odem", r"knochenodem", r"kemik iligi\w* odem", r"οιδημα\w* (του )?(οστικ\w* )?μυελ",
                   r"отек костного мозга", r"edem kostane srzi", r"oedeme osseux", r"beenmergoedeem", r"botoedeem", r"edema oseo",
                   r"костно-?\s?мозъч\w* едем", r"костномозъч\w* едем")
 COMPLETE = rx(r"complet", r"\bfull", r"\btotal", r"komplet", r"vollstandig", r"volledig", r"пълн", r"полн", r"πληρ", r"potpun")
 TRAUMA = rx(r"traumat", r"posttraum", r"травмат", r"посттравмат", r"τραυματ", r"κακωσ", r"\bimpact", r"pivot", r"kissing")
-# Hoffa-sinovitis (MOAKS): edema de la grasa de Hoffa, indicador indirecto de sinovitis sin contraste
+# Hoffa-sinovitis (MOAKS): edema de la grasa de Hoffa como indicador de sinovitis sin contraste
 HOFFA = rx(r"hoffa", r"infrapatellar fat pad (o)?edema", r"infrapatellar yag yastik\w* \w* ?odem")
-# Grado del derrame: el derrame escaso o mínimo se considera no significativo
+# Gradación del derrame
 MILD = rx(r"\bmild\b", r"minimal", r"\bsmall\b", r"\bslight", r"\btrace", r"\bsome\b", r"\bleve\b", r"\bminim", r"pequen",
           r"escaso", r"discret", r"gering", r"\bklein", r"\bwenig", r"hafif", r"az miktar", r"μικρ", r"ελαχ", r"небольш",
           r"незначит", r"минимал", r"малък", r"\bmali\b", r"\bblag", r"minimaal", r"\bklein", r"faible", r"\bpeu\b")
@@ -209,6 +193,7 @@ LABELS = ["acl", "mcl", "medial_meniscus", "lateral_meniscus", "medial_oa", "lat
 
 
 def split_clauses(text: str) -> list[str]:
+    """Divide el texto normalizado en cláusulas por puntuación y conectores de contraste."""
     parts = re.split(r"[.;\n\r•]+|\s-\s", text)
     out = []
     for p in parts:
@@ -217,17 +202,18 @@ def split_clauses(text: str) -> list[str]:
 
 
 def clause_status(clause: str, has_lesion: bool | None = None) -> int:
-    """Estado de un hallazgo encontrado en la cláusula (ver orden de prioridad arriba)."""
+    """Estado de un hallazgo mencionado en la cláusula (incierto > negado > normal > positivo)."""
     if UNCERTAIN.search(clause):
         return UNC
     if NEGATION.search(PSEUDO_NEGATION.sub(" ", clause)):
         return NEG
-    if has_lesion is False:  # anatomía mencionada sin lesión
+    if has_lesion is False:
         return NEG if NORMAL.search(clause) else NM
     return POS
 
 
 def combine(statuses: list[int]) -> int:
+    """Estado del estudio a partir de los estados de sus cláusulas (POS > UNC > NEG > NM)."""
     if POS in statuses:
         return POS
     if UNC in statuses:
@@ -239,10 +225,10 @@ def combine(statuses: list[int]) -> int:
 
 def extract_labels(report: str, evidence: dict[str, list[str]] | None = None) -> dict[str, int]:
     """
-    Aplica todas las reglas a un reporte y devuelve {hallazgo: código}.
+    Estados ``{hallazgo: código}`` de un reporte.
 
-    Si se pasa un diccionario `evidence`, se completa con las cláusulas que originaron cada
-    decisión, en el formato "<estado>: <cláusula>" (análisis de errores).
+    Si se proporciona ``evidence``, se completa con las cláusulas que determinaron cada
+    estado, en el formato ``"<estado>: <cláusula>"``.
     """
     found: dict[str, list[int]] = {k: [] for k in LABELS}
     n_prev = {k: 0 for k in LABELS}
@@ -252,7 +238,7 @@ def extract_labels(report: str, evidence: dict[str, list[str]] | None = None) ->
         for lab in ("acl", "mcl"):
             if ANATOMY[lab].search(clause):
                 if LIGAMENT_LOW_GRADE.search(clause) and not COMPLETE.search(clause):
-                    st = NEG                       # esguince grado 1 / señal intersticial: sin rotura
+                    st = NEG
                 else:
                     st = clause_status(clause, lesion)
                 if st != NM:
@@ -260,8 +246,6 @@ def extract_labels(report: str, evidence: dict[str, list[str]] | None = None) ->
         # --- meniscos (lado medial / lateral) ---
         if ANATOMY["meniscus"].search(clause):
             if (DEGENERATION.search(clause) or MENISCAL_LOW_GRADE.search(clause)) and not TEAR.search(clause):
-                # Degeneración o señal grado 1-2 sin rotura: el hallazgo objetivo es "daño" meniscal,
-                # no solo rotura, por lo que se considera incierto (peso 0 en el entrenamiento).
                 st = NEG if NEGATION.search(PSEUDO_NEGATION.sub(" ", clause)) else UNC
             elif lesion:
                 st = clause_status(clause, True)
@@ -270,7 +254,7 @@ def extract_labels(report: str, evidence: dict[str, list[str]] | None = None) ->
             if st != NM:
                 side = PATELLAR_SIDE.sub(" ", clause)
                 med, lat = bool(MEDIAL.search(side)), bool(LATERAL.search(side))
-                if not med and not lat:  # "meniscos íntegros" -> ambos; "rotura meniscal" -> incierto
+                if not med and not lat:  # sin lateralidad: negación a ambos, lesión como incierta
                     side_st = st if st == NEG else UNC
                     found["medial_meniscus"].append(side_st)
                     found["lateral_meniscus"].append(side_st)
@@ -284,7 +268,7 @@ def extract_labels(report: str, evidence: dict[str, list[str]] | None = None) ->
         if oa_explicit or chondral:
             st = clause_status(clause)
             if not oa_explicit and st == POS and not HIGH_GRADE.search(clause):
-                st = NM                            # condropatía leve u osteofitos aislados: no concluyente
+                st = NM
             if st != NM:
                 side = PATELLAR_SIDE.sub(" ", clause)
                 comps = []
@@ -311,14 +295,14 @@ def extract_labels(report: str, evidence: dict[str, list[str]] | None = None) ->
                     continue
                 st = clause_status(clause)
                 if lab == "effusion" and st == POS and MILD.search(clause) and not MODERATE_LARGE.search(clause):
-                    st = NEG                       # derrame escaso o mínimo: no significativo
+                    st = NEG
                 found[lab].append(st)
-        # --- edema óseo sin la palabra "contusión" ---
+        # --- edema óseo sin mención de contusión ---
         if MARROW_EDEMA.search(clause) and not SIMPLE["bone_contusion"].search(clause):
             st = clause_status(clause)
             if st == NEG or TRAUMA.search(clause):
                 found["bone_contusion"].append(st)
-        # --- sinovitis de Hoffa (edema de la grasa infrarrotuliana) ---
+        # --- Hoffa-sinovitis ---
         if HOFFA.search(clause) and not SIMPLE["synovitis"].search(clause):
             st = clause_status(clause, bool(re.search(r"(o)?edem|odem|infiltrat|signal", clause)))
             if st != NM:
@@ -332,7 +316,7 @@ def extract_labels(report: str, evidence: dict[str, list[str]] | None = None) ->
 
 
 def detect_language(text: str) -> str:
-    """Idioma del reporte (para el análisis de sesgo lingüístico). Devuelve código ISO, p. ej. 'es'."""
+    """Código ISO 639-1 del idioma del reporte (langdetect), o 'unknown'."""
     try:
         from langdetect import DetectorFactory, detect
 

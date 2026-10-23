@@ -1,26 +1,21 @@
 """
-PASO 4 (OPCIONAL, recomendado). Etiquetas débiles con un LLM LOCAL (Ollama).
+Etapa 4 (opcional). Etiquetas débiles con un modelo de lenguaje local (Ollama).
 
-Por qué: las reglas fallan con negaciones complejas ("sin evidencia de rotura del LCA,
-aunque hay edema"), sinónimos y los ~12 idiomas. Un modelo de lenguaje multilingüe
-entiende el reporte completo. Corre 100 % local (Ollama), sin enviar datos a internet.
+Para cada reporte se solicita al modelo el estado de los 12 hallazgos (present, absent,
+uncertain, not_mentioned) con salida restringida por un esquema JSON y temperatura 0.
+La inferencia es local. Por defecto se procesan los estudios dorados y los seleccionados en
+la etapa 5; ``--all`` procesa todos los reportes. El resultado se guarda de forma
+incremental y la ejecución es reanudable.
 
-Se procesan solo los estudios necesarios (dorados + subconjunto seleccionado en el
-PASO 5) para que tome minutos y no horas. Si prefieres etiquetar todo, usa --all.
-
-Requisitos:
-    1. Instalar Ollama para Windows: https://ollama.com/download
-    2. En una terminal:   ollama pull qwen2.5:14b-instruct
-       (cabe de sobra en una RTX 5090; alternativa más ligera: qwen2.5:7b-instruct)
-    3. Ollama queda escuchando en http://localhost:11434
+Requisitos: servidor Ollama en ``llm.host`` con el modelo ``llm.model``
+(p. ej., ``ollama pull qwen2.5:14b-instruct``).
 
 Salidas:
-    <interim_dir>/labels_llm.parquet      (se va guardando: si se corta, se reanuda)
+    <interim_dir>/labels_llm.parquet
     p1_rodilla/reports/tablas/acuerdo_llm_vs_dorado.csv
 
 Uso:
-    python -m p1_rodilla.scripts.s04_etiquetas_llm            # dorados + seleccionados
-    python -m p1_rodilla.scripts.s04_etiquetas_llm --all      # todos los reportes
+    python -m p1_rodilla.scripts.s04_etiquetas_llm [--all]
 """
 from __future__ import annotations
 
@@ -64,12 +59,14 @@ SYSTEM = (
 
 
 def build_prompt(report: str) -> str:
+    """Instrucción con la lista de hallazgos y el reporte (truncado a 6000 caracteres)."""
     lines = "\n".join(f'- "{k}": {v}' for k, v in FINDINGS_DESC.items())
     return (f"Findings:\n{lines}\n\nReport:\n\"\"\"\n{report[:6000]}\n\"\"\"\n\n"
             'Return JSON: {"<finding>": "present|absent|uncertain|not_mentioned", ...} with all 12 keys.')
 
 
 def ask_ollama(host: str, model: str, prompt: str, temperature: float, timeout: int) -> dict:
+    """Consulta ``/api/chat`` con salida restringida al esquema JSON de los hallazgos."""
     schema = {"type": "object",
               "properties": {k: {"type": "string", "enum": list(STATUS)} for k in FINDINGS_DESC},
               "required": list(FINDINGS_DESC)}
@@ -104,7 +101,7 @@ def main() -> None:
         if split.exists():
             wanted |= set(pd.read_csv(split, dtype={"study_id": str}).study_id)
         else:
-            log.warning("Aún no existe split.csv (PASO 5). Se etiquetarán solo los dorados.")
+            log.warning("No existe split.csv (etapa 5); se etiquetan solo los estudios dorados.")
         reports = reports[reports.study_id.isin(wanted)]
     log.info(f"Reportes a etiquetar con {llm['model']}: {len(reports):,}")
 
@@ -120,7 +117,7 @@ def main() -> None:
             log.warning(f"{sid}: {e}")
             continue
         rows.append(row)
-        if i % 25 == 0:  # guardado parcial para poder reanudar
+        if i % 25 == 0:  # guardado incremental
             pd.DataFrame(rows).to_parquet(out, index=False)
     llm_df = pd.DataFrame(rows)
     llm_df.to_parquet(out, index=False)

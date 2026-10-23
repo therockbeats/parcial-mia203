@@ -1,1 +1,1 @@
-"""Utilidades compartidas por las tres preguntas del parcial."""
+"""Utilidades comunes: configuración, semillas, dispositivo y registro."""

@@ -1,15 +1,15 @@
 """
-PASO 8. Evaluación de un experimento en el conjunto DORADO (entregable 3).
+Etapa 8. Evaluación de un experimento en el conjunto dorado.
 
-1. Carga best.pt del experimento.
-2. Predice validación -> elige el umbral por hallazgo que maximiza F1 (justificación del umbral).
-3. Predice el conjunto dorado -> AUC-ROC macro (métrica oficial), AUC por hallazgo,
-   precisión, recall y F1 con los umbrales de validación, e intervalo de confianza 95 %
-   del AUC macro por bootstrap.
-4. Guarda tablas y la figura de curvas ROC.
+Umbral por hallazgo elegido en validación (máximo F1); en el conjunto dorado se calculan
+AUC-ROC por hallazgo y macro (con IC 95 % por bootstrap), precisión promedio, y precisión,
+sensibilidad y F1 con esos umbrales.
 
-Salidas en <runs_dir>/<exp>/:  metrics_gold.csv, metrics_val.csv, preds_gold.csv, summary.json, roc_gold.png
-Uso:  python -m p1_rodilla.scripts.s08_evaluar --exp B_resnet50_bce
+Salidas en <runs_dir>/<exp>/:
+    metrics_gold.csv, metrics_val.csv, preds_gold.csv, summary.json, roc_gold.png
+
+Uso:
+    python -m p1_rodilla.scripts.s08_evaluar --exp B_resnet50_bce
 """
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def main() -> None:
     ap.add_argument("--config", default=str(REPO_ROOT / "p1_rodilla" / "config.yaml"))
     ap.add_argument("--set", action="append", default=[])
     args = ap.parse_args()
-    # Usamos el config guardado por el experimento (mismas opciones con las que se entrenó)
+    # Configuración efectiva guardada por el experimento
     base = load_config(args.config)
     exp_dir = Path(base["data"]["runs_dir"]) / args.exp
     cfg = load_config(exp_dir / "config.yaml", args.set)
@@ -58,7 +58,7 @@ def main() -> None:
     p_va, y_va, w_va = predict(model, make_loader(cfg, make_dataset(cfg, va_df, False), False), device)
     p_go, y_go, _ = predict(model, make_loader(cfg, make_dataset(cfg, go_df, False), False), device)
 
-    # Umbrales elegidos en validación (solo etiquetas con peso > 0)
+    # Umbrales en validación (etiquetas con peso > 0)
     y_va_thr = np.where(w_va > 0, y_va, 0)
     thr = best_f1_thresholds(y_va_thr, p_va)
     m_val = evaluate(y_va, p_va, names, thr, mask=w_va)

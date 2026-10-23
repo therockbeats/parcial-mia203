@@ -1,23 +1,17 @@
 """
-PASO 3b. Análisis de errores de las reglas de etiquetado sobre los dorados de DESARROLLO.
+Etapa 3b. Análisis de errores de las reglas en los estudios dorados de desarrollo.
 
-Para cada hallazgo lista los falsos positivos (regla = positivo/incierto, dorado = 0) y los
-falsos negativos (regla = negativo/no mencionado, dorado = 1), con las cláusulas del reporte
-que originaron la decisión de la regla. Al final incluye el texto completo de cada reporte
-con algún error. Opcionalmente añade una muestra de reportes NO dorados de un idioma, para
-estudiar su vocabulario.
+Lista, por hallazgo, los falsos positivos (regla POS/UNC, dorado 0) y falsos negativos
+(regla NEG/NM, dorado 1) con las cláusulas que determinaron cada estado, seguidos del texto
+de los reportes con errores. Opcionalmente incluye una muestra de reportes no dorados de un
+idioma. Los estudios de reserva se excluyen. La salida contiene texto de los reportes y se
+guarda fuera del repositorio.
 
-Los estudios de RESERVA no se exportan: su acuerdo debe seguir siendo una estimación
-independiente de la calidad de las reglas.
-
-La salida contiene texto de los reportes (datos de la competencia), por eso se escribe en
-<interim_dir> (fuera del repositorio) y no se versiona.
-
-Salida:  <interim_dir>/errores_reglas_desarrollo.md
+Salida:
+    <interim_dir>/errores_reglas_desarrollo.md
 
 Uso:
-    python -m p1_rodilla.scripts.s03b_errores_reglas
-    (opcional) --idioma bg --n 15     añade 15 reportes no dorados en búlgaro
+    python -m p1_rodilla.scripts.s03b_errores_reglas [--idioma bg --n 15]
 """
 from __future__ import annotations
 
@@ -53,7 +47,7 @@ def main() -> None:
     reports = load_reports(cfg).set_index("study_id")
     langs = pd.read_parquet(interim / "labels_rules.parquet")[["study_id", "language"]].set_index("study_id")["language"]
 
-    # Reaplicar las reglas con captura de evidencia
+    # Reglas con registro de evidencia
     rule, evid = {}, {}
     for sid in gold.index:
         ev: dict[str, list[str]] = {}

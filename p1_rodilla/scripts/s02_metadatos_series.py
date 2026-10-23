@@ -1,23 +1,19 @@
 """
-PASO 2. Tabla de metadatos de TODAS las series (una fila por serie).
+Etapa 2. Metadatos de todas las series.
 
-Para cada carpeta <study_id>/<series_id> lee la cabecera DICOM del corte central
-(sin cargar píxeles: es rápido) y deduce:
-    plano (sagital/coronal/axial), supresión grasa (sí/no), ponderación (PD/T2/T1),
-    número de cortes, tamaño, espesor de corte, fabricante, campo magnético, institución.
+Lee en paralelo la cabecera del corte central de cada serie (sin píxeles) y obtiene plano,
+supresión grasa, ponderación, número de cortes, dimensiones, espesor, fabricante, campo
+magnético e institución. Si existe la tabla oficial de series, su plano, supresión grasa y
+sensibilidad a líquido prevalecen sobre los valores deducidos de la cabecera, que se conservan
+como ``plane_dicom`` y ``fat_sat_dicom`` para medir su concordancia.
 
-Si existe la tabla oficial de series (train_series.csv), sus columnas de plano, supresión
-grasa y sensibilidad a líquido REEMPLAZAN a las deducidas de la cabecera (son anotaciones de
-los organizadores y la descripción DICOM a veces está anonimizada: "DummySeriesDesc!").
-Las deducidas se conservan como plane_dicom / fat_sat_dicom y se mide su concordancia.
-
-Salida:  <interim_dir>/series_meta.parquet
-         p1_rodilla/reports/tablas/series_resumen.csv  (conteos por plano/secuencia, para el informe)
+Salidas:
+    <interim_dir>/series_meta.parquet
+    p1_rodilla/reports/tablas/series_resumen.csv
+    p1_rodilla/reports/tablas/concordancia_dicom_vs_oficial.csv
 
 Uso:
-    python -m p1_rodilla.scripts.s02_metadatos_series
-    (opcional) --workers 24    procesos en paralelo
-               --limit 50      solo 50 estudios, para probar rápido
+    python -m p1_rodilla.scripts.s02_metadatos_series [--workers 24] [--limit 50]
 """
 from __future__ import annotations
 
@@ -34,7 +30,7 @@ from p1_rodilla.src.dicom_utils import read_series_header
 
 
 def _one(args):
-    """Función que corre en cada proceso hijo: lee una serie y devuelve un diccionario."""
+    """Metadatos de una serie (ejecutado en un proceso del pool)."""
     study_id, series_dir, ext = args
     row = {"study_id": study_id, "series_id": Path(series_dir).name}
     try:
@@ -46,10 +42,10 @@ def _one(args):
 
 def merge_official_series(meta: pd.DataFrame, cfg: dict, log) -> pd.DataFrame:
     """
-    Une train_series.csv a la tabla de cabeceras y armoniza tres columnas:
-        plane            sagittal / coronal / axial  (oficial si existe; si no, desde la orientación DICOM)
-        fat_sat          True / False                (oficial si existe; si no, desde descripción/ScanOptions)
-        fluid_sensitive  True / False                (oficial si existe; si no, ponderación PD/T2)
+    Une la tabla oficial de series y armoniza ``plane``, ``fat_sat`` y ``fluid_sensitive``.
+
+    Prevalece la anotación oficial; los valores deducidos de la cabecera DICOM (o, para la
+    sensibilidad a líquido, la ponderación PD/T2) solo completan valores faltantes.
     """
     sch = cfg["schema"]
     meta["plane_dicom"], meta["fat_sat_dicom"] = meta.get("plane"), meta.get("fat_sat")
@@ -65,7 +61,6 @@ def merge_official_series(meta: pd.DataFrame, cfg: dict, log) -> pd.DataFrame:
     log.info(f"Unida la tabla oficial {p.name}: {s.shape[0]:,} filas; "
              f"{meta[sch['series_plane_col']].notna().sum():,} de {len(meta):,} series con anotación")
 
-    # La anotación oficial tiene prioridad; la deducida de la cabecera solo cubre valores faltantes.
     off_plane = meta[sch["series_plane_col"]].astype("string").str.lower()
     meta["plane"] = off_plane.where(off_plane.notna(), meta["plane_dicom"])
     for col_cfg, dest, fallback in [("series_fat_sat_col", "fat_sat", meta["fat_sat_dicom"]),
@@ -75,7 +70,7 @@ def merge_official_series(meta: pd.DataFrame, cfg: dict, log) -> pd.DataFrame:
             off = meta[c].map({1: True, 0: False, "1": True, "0": False})
             meta[dest] = off.where(off.notna(), fallback.fillna(False).astype(bool)).astype(bool)
 
-    # Concordancia cabecera DICOM vs anotación oficial (dato útil para el informe)
+    # Concordancia entre la cabecera DICOM y la anotación oficial
     both = meta[off_plane.notna()]
     if len(both):
         acc_plane = (both["plane_dicom"] == both["plane"]).mean()
@@ -102,7 +97,7 @@ def main() -> None:
     ext = sch.get("dicom_ext", ".dcm").lower()
     workers = args.workers or cfg["preprocess"].get("num_workers", 8)
 
-    # 1) Listar carpetas estudio/serie (estructura <images_root>/<study>/<series>/*.dcm)
+    # 1) Carpetas <images_root>/<study>/<series>
     tasks = []
     studies = sorted(p for p in images_root.iterdir() if p.is_dir())
     if args.limit:
@@ -120,14 +115,14 @@ def main() -> None:
             rows.append(f.result())
     meta = pd.DataFrame(rows)
 
-    # 3) Unir la tabla oficial de series y usar sus anotaciones (plano, FS, líquido)
+    # 3) Anotación oficial de series
     meta = merge_official_series(meta, cfg, log)
 
     out = ensure_dir(cfg["data"]["interim_dir"]) / "series_meta.parquet"
     meta.to_parquet(out, index=False)
     log.info(f"Guardado {out}")
 
-    # 4) Resumen para el informe
+    # 4) Resumen por plano y secuencia
     summ = (meta.groupby(["plane", "fat_sat", "fluid_sensitive", "weighting"], dropna=False)
             .agg(series=("series_id", "count"), estudios=("study_id", "nunique"), cortes_mediana=("n_slices", "median"))
             .reset_index().sort_values("series", ascending=False))

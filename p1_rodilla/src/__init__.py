@@ -1,1 +1,1 @@
-"""Paquete Python (este archivo permite importar el módulo)."""
+"""Módulos de la Pregunta 1: datos DICOM, etiquetado, modelos, métricas e interpretabilidad."""
