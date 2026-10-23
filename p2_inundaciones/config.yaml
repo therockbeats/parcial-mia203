@@ -50,14 +50,17 @@ dataset:
   weak_exclude_events: ["Bolivia"]   # Bolivia se reserva como región independiente
 
 # ---------------------------------------------------------------------
-# 3. Preprocesamiento de Sentinel-1 (mismo criterio que los autores del conjunto)
-#    x_dB recortado a [clip_min, clip_max], escalado a [0, 1] y estandarizado.
+# 3. Preprocesamiento de Sentinel-1
+#    x_dB recortado a [clip_min, clip_max] y escalado a [0, 1] (criterio de los autores del
+#    conjunto), y estandarizado con la media y la desviación de los 252 chips dorados de
+#    entrenamiento, solo en píxeles con dato (s03 --solo-estadisticas).
+#    Valores de los autores, como referencia: media [0.6851, 0.5235], desviación [0.0820, 0.1102].
 # ---------------------------------------------------------------------
 preprocess:
   clip_min: -50.0
   clip_max: 1.0
-  mean: [0.6851, 0.5235]     # VV, VH tras el escalado a [0, 1]
-  std: [0.0820, 0.1102]
+  mean: [0.7765, 0.6423]     # VV, VH tras el escalado a [0, 1] (-10.40 y -17.24 dB)
+  std: [0.0788, 0.0932]
   s2_bands: [1, 2, 3, 7, 11, 12]   # B2, B3, B4, B8, B11, B12 (índices base 0)
   s2_scale: 10000.0
   num_workers: 8
