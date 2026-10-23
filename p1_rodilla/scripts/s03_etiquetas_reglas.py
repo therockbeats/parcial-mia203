@@ -17,7 +17,9 @@ Salidas:
     p1_rodilla/reports/tablas/acuerdo_reglas_historial.csv
 
 Uso:
-    python -m p1_rodilla.scripts.s03_etiquetas_reglas --version v3
+    python -m p1_rodilla.scripts.s03_etiquetas_reglas [--version v3]
+
+Sin ``--version`` se usa ``labels.rules_version`` del config.
 """
 from __future__ import annotations
 
@@ -61,10 +63,13 @@ def gold_partition(gold: pd.DataFrame, cfg: dict, log) -> pd.DataFrame:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=str(REPO_ROOT / "p1_rodilla" / "config.yaml"))
-    ap.add_argument("--version", default="v1", help="etiqueta de la versión de las reglas (historial)")
+    ap.add_argument("--version", default=None, help="versión de las reglas (por defecto, labels.rules_version)")
     args = ap.parse_args()
     cfg = load_config(args.config)
     log = get_logger("s03")
+    if args.version is None:
+        args.version = str(cfg["labels"].get("rules_version", "sin_version"))
+    log.info(f"Versión de las reglas: {args.version}")
     names = cfg["labels"]["names"]
     assert names == LABELS, "labels.names debe coincidir con LABELS de labels_rules.py (mismo orden)"
 

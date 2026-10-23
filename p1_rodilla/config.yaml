@@ -86,6 +86,8 @@ labels:
   # Fracción de estudios dorados para el análisis de errores de las reglas (desarrollo);
   # el resto (reserva) solo se usa para medir el acuerdo.
   gold_dev_fraction: 0.5
+  # Versión vigente de las reglas (etiqueta en el historial de acuerdo)
+  rules_version: "v3"
 
 # ---------------------------------------------------------------------
 # 4. Etiquetado con modelo de lenguaje local (etapa 4, opcional)
