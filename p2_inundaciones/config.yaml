@@ -79,6 +79,7 @@ lima:
     pre: "2017-03-05"
   relative_orbit: 171
   orbit_pass: "DESCENDING"
+  sensor_azimuth_deg: 102            # acimut desde el terreno hacia el satélite (rumbo ~192° + vista a la derecha)
   bbox: [-77.16, -12.06, -76.84, -11.75]   # lon_min, lat_min, lon_max, lat_max
   pixel_deg: 8.9832e-05
   chip_size: 512

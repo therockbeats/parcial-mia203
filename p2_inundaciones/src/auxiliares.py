@@ -36,10 +36,40 @@ def jrc(cfg: dict, chip_id: str):
     return np.load(f) if f.exists() else None
 
 
-def slope_deg(dem: np.ndarray, pixel_m: float = 10.0) -> np.ndarray:
+def _dem_gradients(dem: np.ndarray, pixel_m: float, pixel_x_m: float | None, smooth: int):
+    """Derivadas del relieve hacia el este y hacia el norte (m/m).
+
+    El SRTM de 30 m llega remuestreado por vecino más cercano a la grilla de 10 m, con escalones de
+    3 x 3 píxeles; un filtro de media de ``smooth`` píxeles los suaviza antes de derivar.
+    """
+    from scipy.ndimage import uniform_filter
+
+    z = np.nan_to_num(dem, nan=np.nanmean(dem) if np.isfinite(dem).any() else 0.0).astype(np.float64)
+    if smooth > 1:
+        z = uniform_filter(z, size=smooth, mode="nearest")
+    d_row, d_col = np.gradient(z, pixel_m, pixel_x_m or pixel_m)
+    return d_col, -d_row
+
+
+def slope_deg(dem: np.ndarray, pixel_m: float = 10.0, pixel_x_m: float | None = None, smooth: int = 3) -> np.ndarray:
     """Pendiente en grados a partir de un modelo de elevación con píxeles de ``pixel_m`` metros."""
-    gy, gx = np.gradient(np.nan_to_num(dem, nan=np.nanmean(dem) if np.isfinite(dem).any() else 0.0), pixel_m)
-    return np.degrees(np.arctan(np.hypot(gx, gy)))
+    dzde, dzdn = _dem_gradients(dem, pixel_m, pixel_x_m, smooth)
+    return np.degrees(np.arctan(np.hypot(dzde, dzdn)))
+
+
+def local_incidence_deg(dem: np.ndarray, incidence_deg: np.ndarray, sensor_azimuth_deg: float,
+                        pixel_m: float = 10.0, pixel_x_m: float | None = None, smooth: int = 3) -> np.ndarray:
+    """Ángulo de incidencia local: entre la normal del terreno y la dirección hacia el satélite.
+
+    Menor que el ángulo nominal en laderas orientadas hacia el radar (escorzo) y mayor en las
+    opuestas; a partir de 90 grados la ladera queda de espaldas al radar y no devuelve señal.
+    """
+    dzde, dzdn = _dem_gradients(dem, pixel_m, pixel_x_m, smooth)
+    norm = np.sqrt(dzde ** 2 + dzdn ** 2 + 1.0)
+    th = np.radians(np.nan_to_num(incidence_deg, nan=np.nanmean(incidence_deg)))
+    az = np.radians(sensor_azimuth_deg)
+    cos_loc = (-dzde * np.sin(th) * np.sin(az) - dzdn * np.sin(th) * np.cos(az) + np.cos(th)) / norm
+    return np.degrees(np.arccos(np.clip(cos_loc, -1.0, 1.0)))
 
 
 def lulc_group(code: np.ndarray) -> np.ndarray:

@@ -6,7 +6,8 @@ Etapa 10. Generalización geográfica: Sen1Floods11 frente a Bolivia y Lima.
 2. Con el ensamble de la referencia, cuantifica en Lima las hipótesis sobre la brecha:
    a) sensibilidad según el origen del polígono de inundación (cauce o área inundada);
    b) falsos positivos y sensibilidad por cobertura del suelo (urbano, arena y roca, etc.);
-   c) falsos positivos según la pendiente del terreno (sombra y escorzo del radar);
+   c) falsos positivos según la pendiente del terreno y el ángulo de incidencia local (sombra y
+      escorzo del radar), y efecto de enmascarar el relieve como en los servicios operativos;
    d) distribución de la retrodispersión del agua y de la no agua en Sen1Floods11 y en Lima;
    e) ángulo de incidencia de la escena de Lima;
    f) cambio de retrodispersión entre la escena previa y la posterior dentro de los polígonos;
@@ -33,7 +34,7 @@ import pandas as pd
 
 from common.config import REPO_ROOT, load_config
 from common.utils import ensure_dir, get_logger
-from p2_inundaciones.src.auxiliares import lima_aux, lulc_group, s1_db, slope_deg
+from p2_inundaciones.src.auxiliares import local_incidence_deg, lima_aux, lulc_group, s1_db, slope_deg
 from p2_inundaciones.src.ensemble import ensemble_split, ensemble_tables, labels_for, run_dirs
 from p2_inundaciones.src.io_s1f import load_chips, otsu_threshold
 from p2_inundaciones.src.metrics import bootstrap_iou, chip_table_scores, confusion, scores
@@ -116,12 +117,29 @@ def main() -> None:
         t_lulc.to_csv(tab_dir / "lima_hipotesis_cobertura.csv", index=False)
         log.info("\nPor cobertura del suelo:\n" + t_lulc.round(4).to_string(index=False))
     dem = [lima_aux(cfg, c, "dem") for c in ids]
+    ang = [lima_aux(cfg, c, "angle") for c in ids]
+    sl = loc = None
     if all(x is not None for x in dem):
-        sl = np.stack([slope_deg(d) for d in dem])
+        px_y = float(cfg["lima"]["pixel_deg"]) * 111320.0
+        px_x = px_y * np.cos(np.radians(np.mean(cfg["lima"]["bbox"][1::2])))
+        sl = np.stack([slope_deg(d, px_y, px_x) for d in dem])
         cls = np.where(sl < 5, "0-5", np.where(sl < 15, "5-15", np.where(sl < 30, "15-30", ">30")))
         t_sl = rate_table(cls.astype(object), pred, lab, valid, "pendiente_grados")
         t_sl.to_csv(tab_dir / "lima_hipotesis_pendiente.csv", index=False)
         log.info("\nPor pendiente:\n" + t_sl.round(4).to_string(index=False))
+        if all(a is not None for a in ang):
+            az = float(cfg["lima"]["sensor_azimuth_deg"])
+            loc = np.stack([local_incidence_deg(d, a, az, px_y, px_x) for d, a in zip(dem, ang)])
+            bins = [(-1, 30, "<30 (orientada al radar)"), (30, 40, "30-40"), (40, 50, "40-50 (casi plano)"),
+                    (50, 60, "50-60"), (60, 90, "60-90"), (90, 181, ">=90 (de espaldas al radar)")]
+            cls = np.full(loc.shape, "", dtype=object)
+            for lo_, hi_, nm in bins:
+                cls[(loc >= lo_) & (loc < hi_)] = nm
+            t_loc = rate_table(cls, pred, lab, valid, "incidencia_local_grados")
+            t_loc["orden"] = t_loc.incidencia_local_grados.map({nm: i for i, (_, _, nm) in enumerate(bins)})
+            t_loc = t_loc.sort_values("orden").drop(columns="orden")
+            t_loc.to_csv(tab_dir / "lima_hipotesis_incidencia_local.csv", index=False)
+            log.info("\nPor ángulo de incidencia local:\n" + t_loc.round(4).to_string(index=False))
 
     db = np.stack([s1_db(cfg, c) for c in ids])
     rng = np.random.default_rng(0)
@@ -151,7 +169,6 @@ def main() -> None:
     pd.DataFrame(q).to_csv(tab_dir / "lima_hipotesis_retrodispersion.csv", index=False)
 
     extra = {}
-    ang = [lima_aux(cfg, c, "angle") for c in ids]
     if all(a is not None for a in ang):
         a = np.stack(ang)[valid]
         a = a[np.isfinite(a)]
@@ -174,6 +191,20 @@ def main() -> None:
         m = valid & (fuente == code) & (lab == 1)
         if m.any():
             extra[f"frac_bajo_otsu_{nm}"] = float((db[:, 1][m] < thr_otsu).mean())
+    if sl is not None:
+        masks = {"sin máscara": np.zeros_like(valid), "pendiente > 15°": sl > 15}
+        if loc is not None:
+            masks["pendiente > 15° o incidencia local > 60°"] = (sl > 15) | (loc > 60)
+        mrows = []
+        for mname, m in masks.items():
+            for metodo, pr in (("U-Net", pred), ("Otsu VH", otsu_pred)):
+                cm = confusion(pr & ~m, lab, valid & np.isfinite(db[:, 1]))
+                mrows.append({"mascara": mname, "metodo": metodo, "area_excluida_pct": 100 * float(m[valid].mean()),
+                              "agua_ref_excluida_pct": 100 * float(m[valid & (lab == 1)].mean()),
+                              **scores(**cm)})
+        t_m = pd.DataFrame(mrows)
+        t_m.to_csv(tab_dir / "lima_mascara_terreno.csv", index=False)
+        log.info("\nCon máscara de relieve:\n" + t_m.round(4).to_string(index=False))
     c = confusion(pred, lab, valid)
     extra.update({"referencia": ref, "umbral": thr, **{f"modelo_{k}": v for k, v in scores(**c).items()}})
     pd.DataFrame([extra]).T.rename(columns={0: "valor"}).to_csv(tab_dir / "lima_hipotesis_resumen.csv")
