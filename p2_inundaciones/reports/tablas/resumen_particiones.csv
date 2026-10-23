@@ -1,0 +1,6 @@
+split,chips,agua_pct,sin_dato_pct,nubes_media,libres_nubes
+bolivia,15,16.993,10.33,0.091,9.0
+test,90,12.533,2.377,0.166,59.0
+train,252,9.379,2.006,0.156,164.0
+val,89,11.417,0.941,0.175,53.0
+weak,4384,17.124,2.281,,

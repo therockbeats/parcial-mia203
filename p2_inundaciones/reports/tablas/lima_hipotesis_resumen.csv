@@ -1,0 +1,29 @@
+,valor
+angulo_incidencia_min,43.65625
+angulo_incidencia_media,44.666709899902344
+angulo_incidencia_max,45.53125
+cambio_VV_dB_fuera de polígono,-0.0625
+cambio_VH_dB_fuera de polígono,-0.375
+cambio_VV_dB_maximun height,1.609375
+cambio_VH_dB_maximun height,0.640625
+cambio_VV_dB_river,-0.1171875
+cambio_VH_dB_river,-0.125
+otsu_vh_umbral_db,-17.546295166015625
+otsu_iou,0.010580587240897384
+otsu_f1,0.020939620995065154
+otsu_precision,0.01072690214102318
+otsu_recall,0.4368427970557308
+otsu_omision,0.5631572029442692
+otsu_comision,0.9892730978589768
+otsu_exactitud,0.4991768600862683
+frac_bajo_otsu_maximun height,0.22308374543109008
+frac_bajo_otsu_river,0.6912423234390993
+referencia,GW_bcedice
+umbral,0.44999999999999996
+modelo_iou,0.0007770492547133426
+modelo_f1,0.001552891835982884
+modelo_precision,0.0008732701919828515
+modelo_recall,0.007002862483935039
+modelo_omision,0.992997137516065
+modelo_comision,0.9991267298080172
+modelo_exactitud,0.8895977299261336
