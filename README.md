@@ -44,6 +44,7 @@ aproximadamente doce idiomas.
 | Exportación | `s12_exportar_resultados` | Copia de métricas, curvas y mapas a `p1_rodilla/reports/` |
 | Comparación pareada | `s13_comparacion_pareada` | Diferencia de AUC macro frente a la referencia con IC 95 % por bootstrap pareado |
 | Semillas | `s14_semillas` | Corridas adicionales con otras semillas; media y desviación estándar del AUC macro y ensamble de semillas comparado con la referencia |
+| Escala de datos | `s15_escala_datos` | Entrenamiento con subconjuntos anidados de 425 a todos los estudios con etiqueta débil, validación y conjunto dorado fijos; curva de AUC frente al tamaño |
 
 ### Arquitectura
 Cada volumen se representa como una secuencia de cortes; cada corte, junto con sus dos
@@ -128,7 +129,7 @@ efectiva junto a sus resultados.
 ├── p1_rodilla/
 │   ├── config.yaml          parámetros de la Pregunta 1
 │   ├── run_all.py           pipeline completo
-│   ├── scripts/             etapas s00 a s14
+│   ├── scripts/             etapas s00 a s15
 │   ├── src/                 DICOM, etiquetado, dataset, modelos, pérdidas, métricas, Grad-CAM
 │   └── reports/             tablas, figuras y resultados exportados
 ├── p2_inundaciones/         Pregunta 2

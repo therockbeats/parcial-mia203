@@ -1,7 +1,7 @@
 """
 Etapa 6. Preprocesamiento de las series seleccionadas a volúmenes ``.npy``.
 
-Para cada serie de ``split.csv``: lectura y ordenamiento espacial de los cortes, ventana de
+Para cada serie de la partición vigente (``data.split_csv``): lectura y ordenamiento espacial de los cortes, ventana de
 intensidad por percentiles, remuestreo a ``n_slices`` cortes y redimensión a
 ``size`` x ``size``. Se guarda ``<processed_dir>/<study_id>__<series_id>.npy`` (uint8).
 La ejecución es paralela y omite los volúmenes ya existentes.
@@ -13,6 +13,7 @@ Salidas:
 
 Uso:
     python -m p1_rodilla.scripts.s06_preprocesar [--workers 20]
+    python -m p1_rodilla.scripts.s06_preprocesar --set data.split_csv=escala/split_n4274.csv
 """
 from __future__ import annotations
 
@@ -26,6 +27,7 @@ from tqdm import tqdm
 
 from common.config import REPO_ROOT, load_config
 from common.utils import Timer, ensure_dir, get_logger
+from p1_rodilla.src.data_io import split_path
 from p1_rodilla.src.dicom_utils import load_series_volume, normalize_volume
 
 
@@ -47,13 +49,14 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=str(REPO_ROOT / "p1_rodilla" / "config.yaml"))
     ap.add_argument("--workers", type=int, default=None)
+    ap.add_argument("--set", action="append", default=[], help="override seccion.clave=valor (repetible)")
     args = ap.parse_args()
-    cfg = load_config(args.config)
+    cfg = load_config(args.config, args.set)
     log = get_logger("s06")
     pp, sch = cfg["preprocess"], cfg["schema"]
     images_root = Path(cfg["data"]["raw_dir"]) / sch["images_subdir"]
     out_dir = ensure_dir(cfg["data"]["processed_dir"])
-    split = pd.read_csv(Path(cfg["data"]["interim_dir"]) / "split.csv", dtype={"study_id": str, "series_id": str})
+    split = pd.read_csv(split_path(cfg), dtype={"study_id": str, "series_id": str})
 
     tasks = [(images_root / r.study_id / r.series_id, str(out_dir / f"{r.study_id}__{r.series_id}.npy"),
               sch.get("dicom_ext", ".dcm").lower(), pp["n_slices"], pp["size"], pp["p_low"], pp["p_high"])

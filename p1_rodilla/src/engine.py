@@ -8,14 +8,15 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
+from .data_io import split_path
 from .dataset import KneeVolumeDataset
 from .labels_common import to_targets
 from .labels_rules import POS
 
 
 def load_split(cfg: dict) -> pd.DataFrame:
-    """Partición ``split.csv`` restringida a los estudios con volumen preprocesado."""
-    df = pd.read_csv(Path(cfg["data"]["interim_dir"]) / "split.csv", dtype={"study_id": str, "series_id": str})
+    """Partición vigente (``data.split_csv``) restringida a los estudios con volumen preprocesado."""
+    df = pd.read_csv(split_path(cfg), dtype={"study_id": str, "series_id": str})
     proc = Path(cfg["data"]["processed_dir"])
     ok = [(proc / f"{r.study_id}__{r.series_id}.npy").exists() for r in df.itertuples()]
     return df[ok].reset_index(drop=True)

@@ -15,6 +15,7 @@ data:
   processed_dir: "{data_root}/p1_rsna_knee/processed" # volúmenes .npy
   runs_dir: "{runs_root}/p1"                          # pesos y resultados por experimento
   reports_dir: "{repo_root}/p1_rodilla/reports"       # tablas y figuras versionadas
+  split_csv: "split.csv"                              # partición vigente, relativa a interim_dir
 
 # ---------------------------------------------------------------------
 # 2. Esquema del conjunto RSNA Knee Abnormality Detection
@@ -184,3 +185,12 @@ ablation:
       set: ["model.backbone=resnet50", "labels.unmentioned_policy=ignore"]
     - name: "F_resnet50_sobremuestreo"
       set: ["model.backbone=resnet50", "train.sampler=oversample_rare"]
+
+# ---------------------------------------------------------------------
+# 11. Escala de datos: entrenamiento con subconjuntos anidados de tamaño creciente;
+#     validación y conjunto dorado fijos (los de split.csv)
+# ---------------------------------------------------------------------
+scale:
+  train_sizes: [1000, 2000, "todos"]   # el tamaño base de split.csv se incluye siempre
+  experiments: ["B_resnet50_bce", "D_resnet18_bce", "A_scratch_bce"]
+  seeds: [42, 1, 2]

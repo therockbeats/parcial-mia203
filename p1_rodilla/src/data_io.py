@@ -13,6 +13,11 @@ def _read_table(path: Path) -> pd.DataFrame:
     return pd.read_csv(path, low_memory=False)
 
 
+def split_path(cfg: dict) -> Path:
+    """Ruta de la partición vigente: ``data.split_csv`` relativo a ``interim_dir``."""
+    return Path(cfg["data"]["interim_dir"]) / cfg["data"].get("split_csv", "split.csv")
+
+
 def load_studies(cfg: dict) -> pd.DataFrame:
     """Tabla de estudios con el identificador normalizado como ``study_id`` (texto)."""
     sch = cfg["schema"]
