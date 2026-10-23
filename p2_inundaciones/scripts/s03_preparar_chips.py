@@ -14,6 +14,7 @@ Salidas:
 
 Uso:
     python -m p2_inundaciones.scripts.s03_preparar_chips [--workers 12]
+    python -m p2_inundaciones.scripts.s03_preparar_chips --solo-estadisticas
 """
 from __future__ import annotations
 
@@ -42,6 +43,25 @@ def cloud_fraction(s2: np.ndarray, blue_thr: float, cirrus_thr: float) -> float:
     cirrus = s2[10].astype(np.float32) / 10000.0
     cloud = ((blue > blue_thr) | (cirrus > cirrus_thr)) & valid
     return float(cloud.sum() / valid.sum())
+
+
+def train_stats(cfg: dict, chip_ids, proc: Path) -> pd.DataFrame:
+    """Media y desviación estándar de VV y VH escalados a [0, 1] en los píxeles con dato del entrenamiento."""
+    pp = cfg["preprocess"]
+    vals = [[], []]
+    for cid in chip_ids:
+        db = np.load(proc / "s1" / f"{cid}.npy").astype(np.float32)
+        ok = np.isfinite(db).all(axis=0)
+        u = s1_to_unit(db, cfg)
+        for b in range(2):
+            vals[b].append(u[b][::2, ::2][ok[::2, ::2]])
+    rows = []
+    for b, name in enumerate(["VV", "VH"]):
+        v = np.concatenate(vals[b]) if vals[b] else np.array([np.nan])
+        lo, hi = float(pp["clip_min"]), float(pp["clip_max"])
+        rows.append({"banda": name, "media_entrenamiento": float(np.mean(v)), "de_entrenamiento": float(np.std(v)),
+                     "media_db": float(np.mean(v) * (hi - lo) + lo), "media_config": pp["mean"][b], "de_config": pp["std"][b]})
+    return pd.DataFrame(rows)
 
 
 def process_chip(task: dict) -> dict:
@@ -87,9 +107,16 @@ def main() -> None:
     ap.add_argument("--config", default=str(REPO_ROOT / "p2_inundaciones" / "config.yaml"))
     ap.add_argument("--workers", type=int, default=None)
     ap.add_argument("--overwrite", action="store_true")
+    ap.add_argument("--solo-estadisticas", action="store_true", help="solo recalcular estadisticas_s1.csv")
     args = ap.parse_args()
     cfg = load_config(args.config)
     log = get_logger("s03")
+    if args.solo_estadisticas:
+        df = pd.read_parquet(Path(cfg["data"]["interim_dir"]) / "chips.parquet")
+        stats = train_stats(cfg, df.loc[(df.group == "hand") & (df.split == "train"), "chip_id"], Path(cfg["data"]["processed_dir"]))
+        stats.to_csv(ensure_dir(Path(cfg["data"]["reports_dir"]) / "tablas") / "estadisticas_s1.csv", index=False)
+        log.info("\n" + stats.round(4).to_string(index=False))
+        return
     ds, pp = cfg["dataset"], cfg["preprocess"]
     root = raw_root(cfg)
     proc = Path(cfg["data"]["processed_dir"])
@@ -150,15 +177,7 @@ def main() -> None:
     tab = ensure_dir(Path(cfg["data"]["reports_dir"]) / "tablas")
     summ.round(3).to_csv(tab / "resumen_particiones.csv")
 
-    vals = [[], []]
-    for cid in hand_df.loc[hand_df.split == "train", "chip_id"]:
-        u = s1_to_unit(np.load(proc / "s1" / f"{cid}.npy").astype(np.float32), cfg)
-        for b in range(2):
-            vals[b].append(u[b][::4, ::4].ravel())
-    stats = pd.DataFrame({"banda": ["VV", "VH"],
-                          "media_entrenamiento": [float(np.mean(np.concatenate(v))) if v else np.nan for v in vals],
-                          "de_entrenamiento": [float(np.std(np.concatenate(v))) if v else np.nan for v in vals],
-                          "media_config": pp["mean"], "de_config": pp["std"]})
+    stats = train_stats(cfg, hand_df.loc[hand_df.split == "train", "chip_id"], proc)
     stats.to_csv(tab / "estadisticas_s1.csv", index=False)
     log.info("\n" + summ.round(3).to_string())
     log.info("\n" + stats.round(4).to_string(index=False))
