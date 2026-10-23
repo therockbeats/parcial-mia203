@@ -41,7 +41,8 @@ def main() -> None:
     cfg["eval"]["bootstrap"] = 50
     cfg["ablation"]["seeds"] = [42, 1]
     cfg["ablation"]["experiments"] = [e for e in cfg["ablation"]["experiments"]
-                                      if e["name"] in ("G_bcedice", "W_otsu", "GW_bcedice", "WG_ajuste", "GW_atencion")]
+                                      if e["name"] in ("G_bcedice", "W_otsu", "GW_bcedice", "WG_ajuste", "GW_atencion",
+                                                       "G_atencion")]
     for e in cfg["ablation"]["experiments"]:
         if e["name"] == "WG_ajuste":
             e["set"] = [s for s in e["set"] if not s.startswith("train.steps")] + ["train.steps=12"]

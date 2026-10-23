@@ -165,6 +165,27 @@ ablation:
       set: ["model.skip=attention"]
     - name: "GW_prof3"
       set: ["model.depth=3"]
+    # Segunda ronda: mezcla y ajuste con las etiquetas débiles de S2, y decisiones de la red
+    # sobre la configuración de solo chips dorados (diferencias medidas frente a G_bcedice)
+    - name: "GW_s2index"
+      set: ["train.weak_source=S2IndexLabelWeak"]
+    - name: "WG_ajuste_s2index"
+      set: ["train.supervision=gold", "train.init_from=W_s2index", "train.lr=3.0e-4", "train.steps=4000", "train.warmup_steps=100"]
+    - name: "G_bce"
+      ref: "G_bcedice"
+      set: ["train.supervision=gold", "train.loss=bce"]
+    - name: "G_dice"
+      ref: "G_bcedice"
+      set: ["train.supervision=gold", "train.loss=dice"]
+    - name: "G_sin_skip"
+      ref: "G_bcedice"
+      set: ["train.supervision=gold", "model.skip=none"]
+    - name: "G_atencion"
+      ref: "G_bcedice"
+      set: ["train.supervision=gold", "model.skip=attention"]
+    - name: "G_prof3"
+      ref: "G_bcedice"
+      set: ["train.supervision=gold", "model.depth=3"]
 
 # ---------------------------------------------------------------------
 # 9. Fusión SAR + óptico (bono): solo chips dorados con poca nubosidad

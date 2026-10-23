@@ -119,6 +119,8 @@ píxel. Las conexiones de salto son configurables: estándar, filtradas por comp
 | `GW_bce`, `GW_dice` | función de pérdida |
 | `GW_sin_skip`, `GW_atencion` | diseño de las conexiones de salto |
 | `GW_prof3` | profundidad de la red |
+| `GW_s2index`, `WG_ajuste_s2index` | mezcla y ajuste fino con las etiquetas débiles de S2 |
+| `G_bce`, `G_dice`, `G_sin_skip`, `G_atencion`, `G_prof3` | pérdida, conexiones de salto y profundidad con solo chips dorados (frente a `G_bcedice`) |
 
 Pipeline completo de la Pregunta 2: `python -m p2_inundaciones.run_all`; prueba con datos
 sintéticos: `python tests/smoke_test_p2.py`.

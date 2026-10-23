@@ -7,7 +7,8 @@ de ``ablation.seeds``; las corridas ya evaluadas se omiten. Los experimentos con
 
 Para cada configuración reporta la media y la desviación estándar del IoU entre semillas y el
 IoU del ensamble de semillas (promedio de probabilidades, umbral elegido en validación) con su
-IC 95 %, y compara cada ensamble con el de la referencia mediante bootstrap pareado de chips.
+IC 95 %, y compara cada ensamble con el de su referencia (``ref`` del experimento o, si no lo
+indica, ``ablation.reference``) mediante bootstrap pareado de chips.
 
 Salidas:
     p2_inundaciones/reports/tablas/ablacion_corridas.csv, ablacion_resumen.csv
@@ -85,9 +86,12 @@ def summarize(cfg: dict, exps: list[dict], seeds: list[int], reference: str, spl
     pr.to_csv(tab_dir / f"{prefix}_corridas.csv", index=False)
     n = int(cfg["eval"]["bootstrap"])
     rows = []
+    refs = {e["name"]: e.get("ref", reference) for e in exps}
     for name, (thr, tabs) in ens.items():
         g = pr[pr.configuracion == name]
-        r = {"configuracion": name, "semillas": len(g), "umbral_ensamble": thr}
+        ref_name = refs.get(name, reference)
+        r = {"configuracion": name, "referencia": ref_name if ref_name != name else "", "semillas": len(g),
+             "umbral_ensamble": thr}
         for split in splits:
             col = f"iou_{split}"
             if col in g:
@@ -100,8 +104,8 @@ def summarize(cfg: dict, exps: list[dict], seeds: list[int], reference: str, spl
                 r.update({f"{split}_iou_ens": s["iou"], f"{split}_ic95_inf": lo, f"{split}_ic95_sup": hi,
                           f"{split}_f1_ens": s["f1"], f"{split}_precision_ens": s["precision"],
                           f"{split}_recall_ens": s["recall"]})
-                if reference in ens and name != reference and split in ens[reference][1]:
-                    ref = ens[reference][1][split]
+                if ref_name in ens and name != ref_name and split in ens[ref_name][1]:
+                    ref = ens[ref_name][1][split]
                     a = t.set_index("chip_id").loc[ref.chip_id]
                     d, dl, dh, p = paired_bootstrap_iou({k: a[k].values for k in ("tp", "fp", "fn")},
                                                         {k: ref[k].values for k in ("tp", "fp", "fn")}, n, 0)
@@ -126,7 +130,7 @@ def summarize(cfg: dict, exps: list[dict], seeds: list[int], reference: str, spl
     fig.tight_layout()
     fig.savefig(fig_dir / f"{prefix}_iou.png", dpi=150)
     plt.close(fig)
-    cols = ["configuracion", "semillas"] + [c for c in summ.columns if c.endswith(("_iou_ens", "_media", "_de", "_delta_ref", "_p"))]
+    cols = ["configuracion", "referencia", "semillas"] + [c for c in summ.columns if c.endswith(("_iou_ens", "_media", "_de", "_delta_ref", "_p"))]
     log.info("\n" + summ[cols].round(4).to_string(index=False))
     log.info(f"Guardado {tab_dir / f'{prefix}_resumen.csv'}")
     return summ
