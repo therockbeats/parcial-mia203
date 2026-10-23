@@ -20,6 +20,9 @@ dependencies:
   # --- Pregunta 2 ---
   - rasterio
   - geopandas
+  - pyogrio
+  - scipy
+  - earthengine-api
   - pip:
       - --extra-index-url https://download.pytorch.org/whl/cu128
       - torch>=2.7

@@ -19,6 +19,9 @@ dependencies:
   - ipykernel
   - rasterio
   - geopandas
+  - pyogrio
+  - scipy
+  - earthengine-api
   - pip:
       - torch>=2.7
       - torchvision>=0.22

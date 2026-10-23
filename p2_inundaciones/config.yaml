@@ -1,0 +1,184 @@
+# =====================================================================
+#  Pregunta 2: segmentación de agua de inundación en Sentinel-1 (U-Net)
+#  {data_root} y {runs_root} se resuelven con configs/paths.local.yaml;
+#  {repo_root} es la raíz del repositorio.
+# =====================================================================
+
+seed: 42
+
+# ---------------------------------------------------------------------
+# 1. Directorios
+# ---------------------------------------------------------------------
+data:
+  raw_dir: "{data_root}/p2_sen1floods11/raw"          # copia de gs://sen1floods11/v1.1
+  interim_dir: "{data_root}/p2_sen1floods11/interim"  # tablas intermedias
+  processed_dir: "{data_root}/p2_sen1floods11/processed"  # chips en .npy
+  lima_dir: "{data_root}/p2_lima"                     # región de prueba de Lima
+  runs_dir: "{runs_root}/p2"                          # pesos y resultados por experimento
+  reports_dir: "{repo_root}/p2_inundaciones/reports"  # tablas y figuras versionadas
+
+# ---------------------------------------------------------------------
+# 2. Sen1Floods11 v1.1 (bucket público gs://sen1floods11)
+#    Chips de 512 x 512 px a 10 m en EPSG:4326 (8.9832e-5 grados por píxel).
+#    S1: float32, 2 bandas (VV, VH) en dB, con NaN.
+#    LabelHand: int16 (-1 sin dato, 0 no agua, 1 agua).
+#    S1OtsuLabel*: int16 (0, 1; nodata -1). S2IndexLabelWeak: int16 (-1, 0, 1).
+#    S2Hand: int16, 13 bandas (reflectancia x 10000; nodata 0).
+# ---------------------------------------------------------------------
+dataset:
+  bucket: "sen1floods11"
+  version_prefix: "v1.1"
+  download_prefixes:
+    - "splits/flood_handlabeled/"
+    - "data/flood_events/HandLabeled/S1Hand/"
+    - "data/flood_events/HandLabeled/LabelHand/"
+    - "data/flood_events/HandLabeled/S1OtsuLabelHand/"
+    - "data/flood_events/HandLabeled/JRCWaterHand/"
+    - "data/flood_events/HandLabeled/S2Hand/"
+    - "data/flood_events/WeaklyLabeled/S1Weak/"
+    - "data/flood_events/WeaklyLabeled/S1OtsuLabelWeak/"
+    - "data/flood_events/WeaklyLabeled/S2IndexLabelWeak/"
+  hand_dir: "data/flood_events/HandLabeled"
+  weak_dir: "data/flood_events/WeaklyLabeled"
+  splits_dir: "splits/flood_handlabeled"
+  split_files:
+    train: "flood_train_data.csv"
+    val: "flood_valid_data.csv"
+    test: "flood_test_data.csv"
+    bolivia: "flood_bolivia_data.csv"
+  weak_label_sources: ["S1OtsuLabelWeak", "S2IndexLabelWeak"]
+  weak_exclude_events: ["Bolivia"]   # Bolivia se reserva como región independiente
+
+# ---------------------------------------------------------------------
+# 3. Preprocesamiento de Sentinel-1 (mismo criterio que los autores del conjunto)
+#    x_dB recortado a [clip_min, clip_max], escalado a [0, 1] y estandarizado.
+# ---------------------------------------------------------------------
+preprocess:
+  clip_min: -50.0
+  clip_max: 1.0
+  mean: [0.6851, 0.5235]     # VV, VH tras el escalado a [0, 1]
+  std: [0.0820, 0.1102]
+  s2_bands: [1, 2, 3, 7, 11, 12]   # B2, B3, B4, B8, B11, B12 (índices base 0)
+  s2_scale: 10000.0
+  num_workers: 8
+
+# ---------------------------------------------------------------------
+# 4. Región de prueba de Lima (marzo de 2017)
+#    Sentinel-1B IW GRD, órbita descendente 171 (dos polarizaciones VV y VH).
+#    Escena posterior: 17/03/2017, un día antes de la imagen WorldView-2 del 18/03.
+#    Escena previa: 05/03/2017, misma órbita, para el análisis de cambios.
+# ---------------------------------------------------------------------
+lima:
+  gee_project: ""                    # identificador del proyecto de Google Cloud con Earth Engine
+  s1_collection: "COPERNICUS/S1_GRD"
+  scenes:
+    post: "2017-03-17"
+    pre: "2017-03-05"
+  relative_orbit: 171
+  orbit_pass: "DESCENDING"
+  bbox: [-77.16, -12.06, -76.84, -11.75]   # lon_min, lat_min, lon_max, lat_max
+  pixel_deg: 8.9832e-05
+  chip_size: 512
+  gdb: "{data_root}/p2_lima/ems/EMSN038_UTM18S_v0.gdb"
+  water_layers: ["Potential_Maximum_flood"]
+  water_source_field: "source"            # "river": cauce; "maximun height": área inundada
+  ignore_layers: ["CoastA", "LakeresA", "WatrcrsA"]
+  valid_layer: "EMSN038_AOI"
+  lulc_layer: "LULC"
+  lulc_field: "LULC"
+  min_valid_fraction: 0.5
+
+# ---------------------------------------------------------------------
+# 5. Modelo
+# ---------------------------------------------------------------------
+model:
+  in_channels: 2           # VV, VH (8 con las bandas ópticas)
+  base_channels: 32
+  depth: 4                 # número de submuestreos
+  skip: "standard"         # standard | none | attention
+  dropout: 0.1
+
+# ---------------------------------------------------------------------
+# 6. Entrenamiento (presupuesto fijo de pasos para comparar configuraciones)
+# ---------------------------------------------------------------------
+train:
+  supervision: "gold_weak"   # gold | weak | gold_weak
+  weak_source: "S1OtsuLabelWeak"
+  gold_fraction: 0.5         # proporción de chips dorados por lote en gold_weak
+  init_from: null            # experimento cuyo best.pt inicializa el modelo
+  steps: 8000
+  eval_every: 250
+  patience: 12               # evaluaciones sin mejora antes de detener
+  batch_size: 16
+  crop: 256
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  warmup_steps: 300
+  loss: "bce_dice"           # bce | dice | bce_dice
+  pos_weight: 3.0
+  amp: true
+  grad_clip: 1.0
+  num_workers: 8
+  device: "auto"
+  use_s2: false
+
+# Filtro de chips dorados por nubosidad de Sentinel-2 (null: sin filtro)
+data_filter:
+  max_cloud_fraction: null
+
+# ---------------------------------------------------------------------
+# 7. Evaluación
+# ---------------------------------------------------------------------
+eval:
+  threshold: "val"           # "val": máximo IoU en validación; o un número
+  bootstrap: 2000
+  splits: ["test", "bolivia", "lima"]
+
+# ---------------------------------------------------------------------
+# 8. Ablación: experimentos (overrides respecto del config base) y semillas
+# ---------------------------------------------------------------------
+ablation:
+  reference: "GW_bcedice"
+  seeds: [42, 1, 2]
+  experiments:
+    - name: "G_bcedice"
+      set: ["train.supervision=gold"]
+    - name: "W_otsu"
+      set: ["train.supervision=weak"]
+    - name: "W_s2index"
+      set: ["train.supervision=weak", "train.weak_source=S2IndexLabelWeak"]
+    - name: "GW_bcedice"
+      set: []
+    - name: "WG_ajuste"
+      set: ["train.supervision=gold", "train.init_from=W_otsu", "train.lr=3.0e-4", "train.steps=4000", "train.warmup_steps=100"]
+    - name: "GW_bce"
+      set: ["train.loss=bce"]
+    - name: "GW_dice"
+      set: ["train.loss=dice"]
+    - name: "GW_sin_skip"
+      set: ["model.skip=none"]
+    - name: "GW_atencion"
+      set: ["model.skip=attention"]
+    - name: "GW_prof3"
+      set: ["model.depth=3"]
+
+# ---------------------------------------------------------------------
+# 9. Fusión SAR + óptico (bono): solo chips dorados con poca nubosidad
+# ---------------------------------------------------------------------
+fusion:
+  blue_threshold: 0.25       # reflectancia B2 por encima de la cual el píxel se considera nube
+  cirrus_threshold: 0.01     # reflectancia B10
+  experiments:
+    - name: "F_sar"
+      set: ["train.supervision=gold", "data_filter.max_cloud_fraction=0.1"]
+    - name: "F_sar_optico"
+      set: ["train.supervision=gold", "data_filter.max_cloud_fraction=0.1", "train.use_s2=true", "model.in_channels=8"]
+
+# ---------------------------------------------------------------------
+# 10. Análisis de fallos del SAR (umbrales en dB)
+# ---------------------------------------------------------------------
+failures:
+  dark_vv: -15.0             # retrodispersión baja en VV
+  dark_vh: -22.0             # retrodispersión baja en VH
+  bright_vv: -8.0            # retrodispersión alta (doble rebote, vegetación inundada)
+  n_examples: 4

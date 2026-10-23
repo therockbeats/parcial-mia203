@@ -8,8 +8,8 @@ preguntas del examen parcial.
 
 | Pregunta | Tarea | Arquitectura | Datos | Carpeta | Estado |
 |---|---|---|---|---|---|
-| P1 | Clasificación multietiqueta de 12 hallazgos en resonancia magnética de rodilla con supervisión débil | CNN 2.5D con agregación por atención: encoder propio y ResNet-50 preentrenada | RSNA Knee Abnormality Detection (Kaggle) | `p1_rodilla/` | en ejecución |
-| P2 | Segmentación de inundaciones en radar Sentinel-1 y generalización a Lima 2017 | U-Net propia | Sen1Floods11 + Copernicus EMSN038 | `p2_inundaciones/` | en desarrollo |
+| P1 | Clasificación multietiqueta de 12 hallazgos en resonancia magnética de rodilla con supervisión débil | CNN 2.5D con agregación por atención: encoder propio y ResNet-50 preentrenada | RSNA Knee Abnormality Detection (Kaggle) | `p1_rodilla/` | experimentos completados |
+| P2 | Segmentación de inundaciones en radar Sentinel-1 y generalización a Lima 2017 | U-Net propia (salto estándar, con atención o sin salto) | Sen1Floods11 + Sentinel-1 Lima 2017 + Copernicus EMSN038 | `p2_inundaciones/` | en desarrollo |
 | P3 | Detección de fauna en cámaras trampa | YOLOv8/v9 | Caltech Camera Traps (LILA BC) | `p3_fauna/` | en desarrollo |
 
 ---
@@ -68,6 +68,60 @@ independiente. Se comparan dos encoders:
 | `F_resnet50_sobremuestreo` | sobremuestreo de hallazgos poco frecuentes |
 
 Todos los hiperparámetros están en `p1_rodilla/config.yaml`.
+
+---
+
+## Pregunta 2 · Mapeo de inundaciones con Sentinel-1
+
+### Problema
+Segmentar, píxel a píxel, el agua de inundación en imágenes de radar Sentinel-1 (VV, VH). El
+conjunto Sen1Floods11 contiene 446 chips de 512 × 512 px con etiqueta experta (11 eventos) y
+4,385 chips con etiquetas débiles generadas por umbralización (Otsu sobre VH de Sentinel-1 o
+índices de agua de Sentinel-2). La generalización se evalúa en una región propia de Lima
+(marzo de 2017): Sentinel-1B del 17/03/2017 y la delineación de inundación de Copernicus EMS
+EMSN038 (WorldView-2 del 18 y 21/03/2017).
+
+### Pipeline
+
+| Etapa | Script | Descripción |
+|---|---|---|
+| Entorno | `s00_verificar_entorno` | PyTorch y GPU, librerías geoespaciales, controlador OpenFileGDB y Earth Engine |
+| Descarga | `s01_descargar_sen1floods11` | Descarga del bucket público `gs://sen1floods11` (v1.1) mediante su API JSON |
+| Inventario | `s02_inventario` | Archivos por carpeta, particiones oficiales, chips por evento y cabeceras |
+| Chips | `s03_preparar_chips` | Caché en .npy (S1 en dB, etiquetas, bandas S2), fracción de agua, sin dato y nubes |
+| Etiquetas débiles | `s04_calidad_etiquetas` | Otsu S1 frente a la etiqueta experta (ruido y línea base), Otsu S1 frente a índice S2, agua permanente JRC |
+| Lima S1 | `s05_lima_s1_gee` | Escenas posterior y previa desde Earth Engine (`COPERNICUS/S1_GRD`), ángulo de incidencia y SRTM sobre la grilla de chips |
+| Lima S1 (alternativa) | `s05b_lima_s1_geotiff` | Chips desde GeoTIFF propios (grafo SNAP en `p2_inundaciones/snap/`) |
+| Lima etiquetas | `s06_lima_etiquetas` | Rasterización de EMSN038 (inundación, zonas ignoradas, origen del polígono y cobertura del suelo) |
+| Entrenamiento | `s07_entrenar` | Presupuesto fijo de pasos, AdamW, calentamiento y coseno, bf16, mejor modelo por IoU de validación |
+| Evaluación | `s08_evaluar` | Umbral elegido en validación; IoU, F1, precisión, sensibilidad, omisión, comisión e IC 95 % en prueba, Bolivia y Lima |
+| Ablación | `s09_ablacion` | Diez configuraciones con tres semillas, ensambles y comparación pareada con la referencia |
+| Generalización | `s10_generalizacion` | Brecha frente a Bolivia y Lima y cuantificación de hipótesis en Lima |
+| Fallos del SAR | `s11_fallos_sar` | Categorías de error (bordes, superficies oscuras, retrodispersión alta) con ejemplos visuales |
+| Fusión óptica | `s12_fusion_optica` | SAR frente a SAR + Sentinel-2 en chips de baja nubosidad |
+| Exportación | `s13_exportar_resultados` | Copia de métricas y figuras a `p2_inundaciones/reports/` |
+
+### Arquitectura
+U-Net implementada desde cero en PyTorch: bloques de dos convoluciones 3 × 3 con normalización
+por lotes, cuatro submuestreos (32 a 512 canales), convoluciones transpuestas y un logit por
+píxel. Las conexiones de salto son configurables: estándar, filtradas por compuertas de atención
+(Attention U-Net) o ausentes.
+
+### Experimentos de ablación
+
+| Experimento | Factor que varía |
+|---|---|
+| `G_bcedice` | solo chips dorados |
+| `W_otsu` | solo etiquetas débiles de Otsu sobre S1 |
+| `W_s2index` | solo etiquetas débiles del índice de agua de S2 |
+| `GW_bcedice` | referencia: dorados y débiles (Otsu S1) mezclados al 50 % por lote, BCE + Dice |
+| `WG_ajuste` | preentrenamiento con débiles y ajuste fino con dorados |
+| `GW_bce`, `GW_dice` | función de pérdida |
+| `GW_sin_skip`, `GW_atencion` | diseño de las conexiones de salto |
+| `GW_prof3` | profundidad de la red |
+
+Pipeline completo de la Pregunta 2: `python -m p2_inundaciones.run_all`; prueba con datos
+sintéticos: `python tests/smoke_test_p2.py`.
 
 ---
 
@@ -132,7 +186,7 @@ efectiva junto a sus resultados.
 │   ├── scripts/             etapas s00 a s15
 │   ├── src/                 DICOM, etiquetado, dataset, modelos, pérdidas, métricas, Grad-CAM
 │   └── reports/             tablas, figuras y resultados exportados
-├── p2_inundaciones/         Pregunta 2
+├── p2_inundaciones/         Pregunta 2: config, run_all, scripts s00 a s13, src (U-Net, datos, métricas), snap
 ├── p3_fauna/                Pregunta 3
 ├── informe/                 artículos en formato NeurIPS
 ├── presentacion/            diapositivas
@@ -143,7 +197,7 @@ efectiva junto a sus resultados.
 
 | Nombre | Código | Responsabilidad principal |
 |---|---|---|
-| Jose Miguel Alvarado Moreno | 20266834E | P1: Pipeline de datos, arquitectura 2.5D y entrenamiento GPU |
+| Jose Miguel Alvarado Moreno | 20266834E | P1: pipeline de datos, arquitectura 2.5D y entrenamiento en GPU. P2: pipeline de Sen1Floods11 y de la región de Lima, U-Net y experimentos |
 | (completar) | | |
 | (completar) | | |
 | (completar) | | |
