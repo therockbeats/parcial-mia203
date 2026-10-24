@@ -143,6 +143,7 @@ eval:
 # ---------------------------------------------------------------------
 ablation:
   reference: "GW_bcedice"
+  final: "W_s2index"         # mayor IoU de validación (media y ensamble); modelo de las etapas 10 y 11
   seeds: [42, 1, 2]
   experiments:
     - name: "G_bcedice"

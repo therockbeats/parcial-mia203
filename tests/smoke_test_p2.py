@@ -40,6 +40,7 @@ def main() -> None:
                          "warmup_steps": 4, "device": "cpu"})
     cfg["eval"]["bootstrap"] = 50
     cfg["ablation"]["seeds"] = [42, 1]
+    cfg["ablation"]["final"] = "GW_bcedice"
     cfg["ablation"]["experiments"] = [e for e in cfg["ablation"]["experiments"]
                                       if e["name"] in ("G_bcedice", "W_otsu", "GW_bcedice", "WG_ajuste", "GW_atencion",
                                                        "G_atencion")]

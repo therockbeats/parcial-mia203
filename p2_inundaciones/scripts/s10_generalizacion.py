@@ -3,7 +3,7 @@ Etapa 10. Generalización geográfica: Sen1Floods11 frente a Bolivia y Lima.
 
 1. Para cada configuración (ensamble de semillas) compara el IoU, F1, precisión y sensibilidad en
    la prueba en distribución, en Bolivia y en Lima, y calcula la brecha.
-2. Con el ensamble de la referencia, cuantifica en Lima las hipótesis sobre la brecha:
+2. Con el ensamble del modelo final (``ablation.final``), cuantifica en Lima las hipótesis sobre la brecha:
    a) sensibilidad según el origen del polígono de inundación (cauce o área inundada);
    b) falsos positivos y sensibilidad por cobertura del suelo (urbano, arena y roca, etc.);
    c) falsos positivos según la pendiente del terreno y el ángulo de incidencia local (sombra y
@@ -18,7 +18,7 @@ Salidas:
     p2_inundaciones/reports/figuras/lima_mapa_errores.png, retrodispersion_s1f_vs_lima.png
 
 Uso:
-    python -m p2_inundaciones.scripts.s10_generalizacion [--ref GW_bcedice]
+    python -m p2_inundaciones.scripts.s10_generalizacion [--ref W_s2index]
 """
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ def main() -> None:
     cfg = load_config(args.config)
     log = get_logger("s10")
     ab = cfg["ablation"]
-    ref = args.ref or ab["reference"]
+    ref = args.ref or ab.get("final", ab["reference"])
     seeds = [int(s) for s in ab["seeds"]]
     tab_dir = ensure_dir(Path(cfg["data"]["reports_dir"]) / "tablas")
     fig_dir = ensure_dir(Path(cfg["data"]["reports_dir"]) / "figuras")
@@ -93,7 +93,7 @@ def main() -> None:
     dirs = run_dirs(cfg, ref, seeds)
     ids, probs = ensemble_split(dirs, "lima") if dirs else (None, None)
     if ids is None:
-        log.warning("Sin predicciones de Lima de la referencia; se omiten las hipótesis")
+        log.warning("Sin predicciones de Lima del modelo final; se omiten las hipótesis")
         return
     thr = ensemble_tables(cfg, dirs, [])[0]
     lab, valid = labels_for(cfg, ids, "lima")

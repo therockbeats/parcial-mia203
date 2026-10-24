@@ -1,8 +1,8 @@
 """
 Etapa 11. Análisis de fallos característicos del SAR.
 
-Clasifica los píxeles mal predichos por el ensamble de la referencia según su retrodispersión y
-su contexto:
+Clasifica los píxeles mal predichos por el ensamble del modelo final (``ablation.final``) según
+su retrodispersión y su contexto:
 
     borde            error a menos de 2 píxeles del contorno de la referencia (píxeles mixtos,
                      desajuste geométrico entre imagen y etiqueta)
@@ -22,7 +22,7 @@ Salidas:
     p2_inundaciones/reports/figuras/fallos_<categoria>.png
 
 Uso:
-    python -m p2_inundaciones.scripts.s11_fallos_sar [--ref GW_bcedice] [--splits test bolivia lima]
+    python -m p2_inundaciones.scripts.s11_fallos_sar [--ref W_s2index] [--splits test bolivia lima]
 """
 from __future__ import annotations
 
@@ -80,7 +80,7 @@ def main() -> None:
     cfg = load_config(args.config)
     log = get_logger("s11")
     fc = cfg["failures"]
-    ref = args.ref or cfg["ablation"]["reference"]
+    ref = args.ref or cfg["ablation"].get("final", cfg["ablation"]["reference"])
     dirs = run_dirs(cfg, ref, [int(s) for s in cfg["ablation"]["seeds"]])
     if not dirs:
         raise FileNotFoundError(f"Sin corridas evaluadas de {ref}")
