@@ -1,0 +1,214 @@
+seed: 42
+data:
+  raw_dir: D:/MIA203/data/p2_sen1floods11/raw
+  interim_dir: D:/MIA203/data/p2_sen1floods11/interim
+  processed_dir: D:/MIA203/data/p2_sen1floods11/processed
+  lima_dir: D:/MIA203/data/p2_lima
+  runs_dir: D:/MIA203/runs/p2
+  reports_dir: D:/MIA203/repo/parcial-mia203/p2_inundaciones/reports
+dataset:
+  bucket: sen1floods11
+  version_prefix: v1.1
+  download_prefixes:
+  - splits/flood_handlabeled/
+  - data/flood_events/HandLabeled/S1Hand/
+  - data/flood_events/HandLabeled/LabelHand/
+  - data/flood_events/HandLabeled/S1OtsuLabelHand/
+  - data/flood_events/HandLabeled/JRCWaterHand/
+  - data/flood_events/HandLabeled/S2Hand/
+  - data/flood_events/WeaklyLabeled/S1Weak/
+  - data/flood_events/WeaklyLabeled/S1OtsuLabelWeak/
+  - data/flood_events/WeaklyLabeled/S2IndexLabelWeak/
+  hand_dir: data/flood_events/HandLabeled
+  weak_dir: data/flood_events/WeaklyLabeled
+  splits_dir: splits/flood_handlabeled
+  split_files:
+    train: flood_train_data.csv
+    val: flood_valid_data.csv
+    test: flood_test_data.csv
+    bolivia: flood_bolivia_data.csv
+  weak_label_sources:
+  - S1OtsuLabelWeak
+  - S2IndexLabelWeak
+  weak_exclude_events:
+  - Bolivia
+preprocess:
+  clip_min: -50.0
+  clip_max: 1.0
+  mean:
+  - 0.7765
+  - 0.6423
+  std:
+  - 0.0788
+  - 0.0932
+  s2_bands:
+  - 1
+  - 2
+  - 3
+  - 7
+  - 11
+  - 12
+  s2_scale: 10000.0
+  num_workers: 8
+lima:
+  gee_project: ''
+  s1_collection: COPERNICUS/S1_GRD
+  scenes:
+    post: '2017-03-17'
+    pre: '2017-03-05'
+  relative_orbit: 171
+  orbit_pass: DESCENDING
+  sensor_azimuth_deg: 102
+  bbox:
+  - -77.16
+  - -12.06
+  - -76.84
+  - -11.75
+  pixel_deg: 8.9832e-05
+  chip_size: 512
+  gdb: D:/MIA203/data/p2_lima/ems/EMSN038_UTM18S_v0.gdb
+  water_layers:
+  - Potential_Maximum_flood
+  water_source_field: source
+  ignore_layers:
+  - CoastA
+  - LakeresA
+  - WatrcrsA
+  valid_layer: EMSN038_AOI
+  lulc_layer: LULC
+  lulc_field: LULC
+  min_valid_fraction: 0.5
+model:
+  in_channels: 2
+  base_channels: 32
+  depth: 3
+  skip: standard
+  dropout: 0.1
+train:
+  supervision: gold
+  weak_source: S1OtsuLabelWeak
+  gold_fraction: 0.5
+  init_from: null
+  steps: 8000
+  eval_every: 250
+  patience: 12
+  batch_size: 16
+  crop: 256
+  lr: 0.001
+  weight_decay: 0.0001
+  warmup_steps: 300
+  loss: bce_dice
+  pos_weight: 3.0
+  amp: true
+  grad_clip: 1.0
+  num_workers: 8
+  device: auto
+  use_s2: false
+data_filter:
+  max_cloud_fraction: null
+eval:
+  threshold: val
+  bootstrap: 2000
+  splits:
+  - test
+  - bolivia
+  - lima
+ablation:
+  reference: GW_bcedice
+  seeds:
+  - 42
+  - 1
+  - 2
+  experiments:
+  - name: G_bcedice
+    set:
+    - train.supervision=gold
+  - name: W_otsu
+    set:
+    - train.supervision=weak
+  - name: W_s2index
+    set:
+    - train.supervision=weak
+    - train.weak_source=S2IndexLabelWeak
+  - name: GW_bcedice
+    set: []
+  - name: WG_ajuste
+    set:
+    - train.supervision=gold
+    - train.init_from=W_otsu
+    - train.lr=3.0e-4
+    - train.steps=4000
+    - train.warmup_steps=100
+  - name: GW_bce
+    set:
+    - train.loss=bce
+  - name: GW_dice
+    set:
+    - train.loss=dice
+  - name: GW_sin_skip
+    set:
+    - model.skip=none
+  - name: GW_atencion
+    set:
+    - model.skip=attention
+  - name: GW_prof3
+    set:
+    - model.depth=3
+  - name: GW_s2index
+    set:
+    - train.weak_source=S2IndexLabelWeak
+  - name: WG_ajuste_s2index
+    set:
+    - train.supervision=gold
+    - train.init_from=W_s2index
+    - train.lr=3.0e-4
+    - train.steps=4000
+    - train.warmup_steps=100
+  - name: G_bce
+    ref: G_bcedice
+    set:
+    - train.supervision=gold
+    - train.loss=bce
+  - name: G_dice
+    ref: G_bcedice
+    set:
+    - train.supervision=gold
+    - train.loss=dice
+  - name: G_sin_skip
+    ref: G_bcedice
+    set:
+    - train.supervision=gold
+    - model.skip=none
+  - name: G_atencion
+    ref: G_bcedice
+    set:
+    - train.supervision=gold
+    - model.skip=attention
+  - name: G_prof3
+    ref: G_bcedice
+    set:
+    - train.supervision=gold
+    - model.depth=3
+fusion:
+  blue_threshold: 0.25
+  cirrus_threshold: 0.01
+  experiments:
+  - name: F_sar
+    set:
+    - train.supervision=gold
+    - data_filter.max_cloud_fraction=0.1
+  - name: F_sar_optico
+    set:
+    - train.supervision=gold
+    - data_filter.max_cloud_fraction=0.1
+    - train.use_s2=true
+    - model.in_channels=8
+failures:
+  dark_vv: -15.0
+  dark_vh: -22.0
+  bright_vv: -8.0
+  n_examples: 4
+_machine_paths:
+  data_root: D:/MIA203/data
+  runs_root: D:/MIA203/runs
+_config_path: D:\MIA203\repo\parcial-mia203\p2_inundaciones\config.yaml
