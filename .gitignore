@@ -42,3 +42,4 @@ Thumbs.db
 
 # Los logs de entrenamiento exportados a reports/ sí se versionan
 !p1_rodilla/reports/**/*.log
+!p3_fauna/reports/**/*.log

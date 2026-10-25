@@ -1,0 +1,139 @@
+# =====================================================================
+#  Pregunta 3: detección de fauna en cámaras trampa (YOLOv8, CCT-20)
+#  {data_root} y {runs_root} se resuelven con configs/paths.local.yaml;
+#  {repo_root} es la raíz del repositorio.
+# =====================================================================
+
+seed: 42
+
+# ---------------------------------------------------------------------
+# 1. Directorios
+# ---------------------------------------------------------------------
+data:
+  raw_dir: "{data_root}/p3_cct20/raw"                  # descarga de LILA BC (imágenes y anotaciones)
+  images_subdir: "eccv_18_all_images_sm"               # imágenes CCT-20 (lado mayor <= 1024 px)
+  annotations_subdir: "eccv_18_annotation_files"       # JSON en formato COCO Camera Traps
+  yolo_dir: "{data_root}/p3_cct20/yolo"                # imágenes enlazadas, etiquetas YOLO y listas
+  runs_dir: "{runs_root}/p3"                           # pesos y resultados por experimento
+  reports_dir: "{repo_root}/p3_fauna/reports"          # tablas y figuras versionadas
+
+# ---------------------------------------------------------------------
+# 2. Caltech Camera Traps, subconjunto CCT-20 (Beery et al., ECCV 2018)
+#    ~57,868 imágenes de 20 cámaras del suroeste de EE. UU., 15 especies.
+#    cis  = cámaras presentes en entrenamiento; trans = cámaras nunca vistas.
+#    Las imágenes vacías llevan la categoría "empty" y no tienen caja.
+# ---------------------------------------------------------------------
+dataset:
+  split_files:
+    train: "train_annotations.json"
+    cis_val: "cis_val_annotations.json"
+    trans_val: "trans_val_annotations.json"
+    cis_test: "cis_test_annotations.json"
+    trans_test: "trans_test_annotations.json"
+  empty_category: "empty"
+  link_mode: "hardlink"        # hardlink | symlink | copy (en Windows hardlink no requiere permisos)
+
+# ---------------------------------------------------------------------
+# 3. Conjunto de entrenamiento (se arma por experimento en la etapa 3)
+#    empty_ratio_train: imágenes vacías como fondo, en proporción a las imágenes con animal.
+#    Repeat Factor Sampling (LVIS): r_c = max(1, sqrt(t / f_c)), f_c = fracción de imágenes
+#    con la especie c; cada imagen se repite max_c r_c veces por época.
+# ---------------------------------------------------------------------
+sampling:
+  empty_ratio_train: 0.25
+  repeat_factor_sampling: true
+  rfs_threshold: 0.10
+
+# ---------------------------------------------------------------------
+# 4. Entrenamiento (argumentos de Ultralytics; selección de modelo en cis_val)
+# ---------------------------------------------------------------------
+train:
+  model: "yolov8s.pt"          # preentrenado en COCO
+  device: "auto"               # auto | cpu | 0 | mps
+  imgsz: 640
+  epochs: 60
+  batch: 16
+  patience: 15
+  optimizer: "AdamW"
+  lr0: 0.001
+  cos_lr: true
+  workers: 8
+  mosaic: 1.0
+  close_mosaic: 10             # sin mosaico en las últimas 10 épocas
+  mixup: 0.1
+  fliplr: 0.5
+  flipud: 0.0                  # los animales no aparecen invertidos
+  hsv_h: 0.015
+  hsv_s: 0.5                   # imágenes nocturnas infrarrojas casi en escala de grises
+  hsv_v: 0.4                   # cambios de iluminación día / noche
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5
+  erasing: 0.0
+  plots: true
+
+# ---------------------------------------------------------------------
+# 5. Evaluación
+#    conf bajo para el mAP (curva precisión-recall completa); deploy_conf para el uso real
+#    (presencia por imagen, robustez y monitoreo).
+# ---------------------------------------------------------------------
+eval:
+  splits: ["cis_val", "trans_val", "cis_test", "trans_test"]
+  select_split: "cis_val"      # nunca se elige con trans: es la medida de generalización
+  conf: 0.001
+  iou: 0.6
+  deploy_conf: 0.35
+  batch: 16
+  plots: true
+
+# ---------------------------------------------------------------------
+# 6. Ablación: experimentos (overrides respecto del config base)
+# ---------------------------------------------------------------------
+ablation:
+  reference: "B_yolov8s"
+  experiments:
+    - name: "A_yolov8n"
+      set: ["train.model=yolov8n.pt"]
+    - name: "B_yolov8s"
+      set: []
+    - name: "C_sin_vacias"
+      set: ["sampling.empty_ratio_train=0.0"]
+    - name: "D_sin_rfs"
+      set: ["sampling.repeat_factor_sampling=false"]
+    - name: "E_sin_mosaico"
+      set: ["train.mosaic=0.0", "train.mixup=0.0"]
+    - name: "F_img1024"
+      set: ["train.imgsz=1024", "train.batch=8"]
+
+# ---------------------------------------------------------------------
+# 7. Robustez: tamaño relativo (área de la caja / área de la imagen) y oclusión
+#    La oclusión no está anotada en CCT: proxy = 0.5 * truncada por el borde + IoU máximo con
+#    otra caja (bajo < 0.15 <= medio < 0.5 <= alto). Una muestra anotada a mano en
+#    manual_occlusion_csv (image_id, ann_idx, occlusion) reemplaza y valida el proxy.
+# ---------------------------------------------------------------------
+robustness:
+  splits: ["cis_test", "trans_test"]
+  size_bins: [0.0, 0.01, 0.10, 1.01]
+  size_names: ["pequeño", "mediano", "grande"]
+  occ_bins: [0.15, 0.5]
+  manual_occlusion_csv: "{repo_root}/p3_fauna/reports/tablas/oclusion_manual.csv"
+  max_images: 3000
+
+# ---------------------------------------------------------------------
+# 8. Dependencia del fondo: Grad-CAM, concentración en la caja y prueba de enmascarado
+#    Capa 9 = SPPF (fin del backbone); capa 15 = salida P3 del neck (stride 8).
+# ---------------------------------------------------------------------
+background:
+  layers: [9, 15]
+  n_images: 400                # imágenes por partición para las métricas
+  n_figures: 12                # superposiciones guardadas por partición y capa
+  mask_blur_sigma: 25
+
+# ---------------------------------------------------------------------
+# 9. Monitoreo ecológico basado en reglas (cámara no vista)
+# ---------------------------------------------------------------------
+monitor:
+  split: "trans_test"
+  camera: null                 # null: la cámara con más imágenes de la partición
+  independence_minutes: 30     # criterio estándar de evento independiente
+  period: "D"                  # D (día) | W (semana) | M (mes)

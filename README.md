@@ -10,7 +10,7 @@ preguntas del examen parcial.
 |---|---|---|---|---|---|
 | P1 | Clasificación multietiqueta de 12 hallazgos en resonancia magnética de rodilla con supervisión débil | CNN 2.5D con agregación por atención: encoder propio y ResNet-50 preentrenada | RSNA Knee Abnormality Detection (Kaggle) | `p1_rodilla/` | experimentos completados |
 | P2 | Segmentación de inundaciones en radar Sentinel-1 y generalización a Lima 2017 | U-Net propia (salto estándar, con atención o sin salto) | Sen1Floods11 + Sentinel-1 Lima 2017 + Copernicus EMSN038 | `p2_inundaciones/` | en desarrollo |
-| P3 | Detección de fauna en cámaras trampa | YOLOv8/v9 | Caltech Camera Traps (LILA BC) | `p3_fauna/` | en desarrollo |
+| P3 | Detección de fauna en cámaras trampa, generalización a cámaras nuevas y monitoreo ecológico | YOLOv8 (Ultralytics) con ajuste fino desde COCO | Caltech Camera Traps, subconjunto CCT-20 (LILA BC) | `p3_fauna/` | pipeline implementado; experimentos pendientes |
 
 ---
 
@@ -127,6 +127,54 @@ sintéticos: `python tests/smoke_test_p2.py`.
 
 ---
 
+## Pregunta 3 · Detección de fauna en cámaras trampa
+
+### Problema
+Detectar y clasificar animales en fotografías de cámaras trampa y convertir las detecciones en
+un reporte de actividad útil para un equipo de manejo de fauna. Se usa CCT-20, el subconjunto de
+referencia de Caltech Camera Traps (Beery et al., ECCV 2018): unas 57,868 imágenes de 20 cámaras
+del suroeste de EE. UU. con cajas para 15 especies. Las particiones *cis* contienen cámaras vistas
+en entrenamiento y las *trans* cámaras nunca vistas, lo que permite medir la generalización. Más
+de la mitad de las imágenes son vacías (disparos por viento, luz o movimiento de vegetación).
+
+### Pipeline
+
+| Etapa | Script | Descripción |
+|---|---|---|
+| Entorno | `s00_verificar_entorno` | PyTorch y GPU, Ultralytics (inferencia de prueba) y archivos de CCT-20 |
+| Inventario | `s01_inventario` | Imágenes con caja, vacías y ambiguas por partición, cámaras cis/trans y cajas por especie |
+| Conversión | `s02_convertir_yolo` | COCO Camera Traps a YOLO; vacías como imágenes de fondo; área relativa y proxy de oclusión por caja |
+| Entrenamiento | `s03_entrenar` | Lista por experimento (proporción de vacías y Repeat Factor Sampling), ajuste fino de YOLOv8, selección en cis_val |
+| Evaluación | `s04_evaluar` | mAP@0.5 y mAP@0.5:0.95 globales y por especie en cis/trans; presencia por imagen y falsos positivos en vacías; brecha cis - trans |
+| Ablación | `s05_ablacion` | Seis configuraciones (tabla abajo) |
+| Desbalance | `s06_desbalance` | Prevalencias, AP por especie frente a su frecuencia, efecto de las vacías y del sobremuestreo |
+| Robustez | `s07_robustez` | Recall por caja y mAP según tamaño relativo y oclusión |
+| Fondo | `s08_fondo_gradcam` | Grad-CAM, concentración del mapa en el animal y prueba de enmascarado en cámaras vistas y nuevas |
+| Monitoreo | `s09_monitoreo` | Reglas sobre una cámara trans: MaxN por secuencia, eventos independientes (30 min), índice de abundancia relativa, actividad por periodo y franja horaria, validado con las etiquetas |
+| Exportación | `s10_exportar_resultados` | Copia de métricas, curvas, mapas y reportes a `p3_fauna/reports/` |
+
+### Arquitectura
+YOLOv8 (Ultralytics): detector de una etapa sin anclas, con backbone CSP (bloques C2f y SPPF),
+cuello PAN-FPN con salidas a tres escalas y cabeza desacoplada para caja y clase. Se parte de
+pesos preentrenados en COCO y se ajusta con AdamW, decaimiento coseno, mosaico (desactivado en las
+últimas épocas), mixup y variación de color para las imágenes nocturnas infrarrojas.
+
+### Experimentos de ablación
+
+| Experimento | Factor que varía |
+|---|---|
+| `A_yolov8n` | tamaño del modelo (nano) |
+| `B_yolov8s` | referencia |
+| `C_sin_vacias` | sin imágenes vacías como fondo |
+| `D_sin_rfs` | sin sobremuestreo de especies poco frecuentes |
+| `E_sin_mosaico` | sin aumento por mosaico ni mixup |
+| `F_img1024` | resolución de entrada 1024 px |
+
+Pipeline completo de la Pregunta 3: `python -m p3_fauna.run_all`; prueba con datos sintéticos:
+`python tests/smoke_test_p3.py`.
+
+---
+
 ## Requerimientos
 
 - Python 3.11 y conda (Miniforge).
@@ -189,7 +237,7 @@ efectiva junto a sus resultados.
 │   ├── src/                 DICOM, etiquetado, dataset, modelos, pérdidas, métricas, Grad-CAM
 │   └── reports/             tablas, figuras y resultados exportados
 ├── p2_inundaciones/         Pregunta 2: config, run_all, scripts s00 a s13, src (U-Net, datos, métricas), snap
-├── p3_fauna/                Pregunta 3
+├── p3_fauna/                Pregunta 3: config, run_all, scripts s00 a s10, src (COCO → YOLO, muestreo, métricas, Grad-CAM, monitoreo)
 ├── informe/                 artículos en formato NeurIPS
 ├── presentacion/            diapositivas
 └── tests/                   datos sintéticos y prueba de extremo a extremo
