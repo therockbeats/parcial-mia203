@@ -32,16 +32,39 @@ dataset:
     trans_test: "trans_test_annotations.json"
   empty_category: "empty"
   link_mode: "hardlink"        # hardlink | symlink | copy (en Windows hardlink no requiere permisos)
+  # Anotaciones adicionales que se suman a una partición (las genera la etapa 1b)
+  extra_files:
+    train: ["train_vacias_annotations.json"]
+
+# ---------------------------------------------------------------------
+# 2b. Imágenes vacías para entrenamiento (etapa 1b)
+#    La partición train de CCT-20 no contiene imágenes vacías: los autores solo conservaron
+#    imágenes con animal. El enunciado pide manejar las vacías como clase de fondo, así que se
+#    toman del Caltech Camera Traps completo (243,100 imágenes, ~70 % vacías). Las 10 cámaras de
+#    entrenamiento solo tienen 2,130 vacías y todas están en cis_val / cis_test, por lo que se usan
+#    vacías de cámaras que no forman parte de CCT-20, nunca de cámaras trans ni de secuencias de
+#    CCT-20, y se reducen a <= 1024 px como el resto de CCT-20.
+# ---------------------------------------------------------------------
+empties:
+  # "Image-level annotations" del dataset completo (.json o .zip). null: se busca en raw_dir un
+  # archivo caltech_images*.json(.zip) o caltech_camera_traps*.json(.zip)
+  full_metadata: null
+  image_base: "https://lilawildlife.blob.core.windows.net/lila-wildlife/caltech-unzipped/cct_images"
+  n_images: 3000               # ~25 % de las 12,099 imágenes con caja de train
+  solo_camaras_train: false    # true: exigir vacías de las cámaras de train (no hay disponibles en CCT-20)
+  max_side: 1024
+  workers: 16                  # descargas en paralelo
 
 # ---------------------------------------------------------------------
 # 3. Conjunto de entrenamiento (se arma por experimento en la etapa 3)
-#    empty_ratio_train: imágenes vacías como fondo, en proporción a las imágenes con animal.
-#    Repeat Factor Sampling (LVIS): r_c = max(1, sqrt(t / f_c)), f_c = fracción de imágenes
-#    con la especie c; cada imagen se repite max_c r_c veces por época.
+#    empty_ratio_train: imágenes vacías como fondo (sin etiqueta), en proporción a las imágenes
+#    con animal. Extra: Repeat Factor Sampling (LVIS) para especies poco frecuentes:
+#    r_c = max(1, sqrt(t / f_c)), f_c = fracción de imágenes con la especie c; cada imagen se
+#    repite max_c r_c veces por época.
 # ---------------------------------------------------------------------
 sampling:
-  empty_ratio_train: 0.25
-  repeat_factor_sampling: true
+  empty_ratio_train: 0.25      # las 3,000 vacías de la etapa 1b (~3,025 = 25 % de 12,099)
+  repeat_factor_sampling: false   # extra: experimento D_con_rfs
   rfs_threshold: 0.10
 
 # ---------------------------------------------------------------------
@@ -51,9 +74,9 @@ train:
   model: "yolov8s.pt"          # preentrenado en COCO
   device: "auto"               # auto | cpu | 0 | mps
   imgsz: 640
-  epochs: 60
+  epochs: 40                   # ~6-8 h por experimento en una RTX 3050 de 6 GB
   batch: 16
-  patience: 15
+  patience: 10
   optimizer: "AdamW"
   lr0: 0.001
   cos_lr: true
@@ -87,23 +110,26 @@ eval:
   plots: true
 
 # ---------------------------------------------------------------------
-# 6. Ablación: experimentos (overrides respecto del config base)
+# 6. Experimentos (overrides respecto del config base)
 # ---------------------------------------------------------------------
 ablation:
   reference: "B_yolov8s"
+  # Lo que pide el enunciado: modelo de referencia y efecto de las vacías como fondo
   experiments:
-    - name: "A_yolov8n"
-      set: ["train.model=yolov8n.pt"]
     - name: "B_yolov8s"
       set: []
     - name: "C_sin_vacias"
       set: ["sampling.empty_ratio_train=0.0"]
-    - name: "D_sin_rfs"
-      set: ["sampling.repeat_factor_sampling=false"]
+  # Extras (no exigidos): se ejecutan con  python -m p3_fauna.scripts.s05_ablacion --extras
+  extra_experiments:
+    - name: "A_yolov8n"
+      set: ["train.model=yolov8n.pt"]
+    - name: "D_con_rfs"
+      set: ["sampling.repeat_factor_sampling=true"]
     - name: "E_sin_mosaico"
       set: ["train.mosaic=0.0", "train.mixup=0.0"]
     - name: "F_img1024"
-      set: ["train.imgsz=1024", "train.batch=8"]
+      set: ["train.imgsz=1024", "train.batch=4"]   # 4 cabe en una GPU de 6 GB
 
 # ---------------------------------------------------------------------
 # 7. Robustez: tamaño relativo (área de la caja / área de la imagen) y oclusión

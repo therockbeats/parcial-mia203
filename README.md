@@ -134,23 +134,28 @@ Detectar y clasificar animales en fotografías de cámaras trampa y convertir la
 un reporte de actividad útil para un equipo de manejo de fauna. Se usa CCT-20, el subconjunto de
 referencia de Caltech Camera Traps (Beery et al., ECCV 2018): unas 57,868 imágenes de 20 cámaras
 del suroeste de EE. UU. con cajas para 15 especies. Las particiones *cis* contienen cámaras vistas
-en entrenamiento y las *trans* cámaras nunca vistas, lo que permite medir la generalización. Más
-de la mitad de las imágenes son vacías (disparos por viento, luz o movimiento de vegetación).
+en entrenamiento y las *trans* cámaras nunca vistas (equivalentes a `eccv_train` / `eccv_val` del
+dataset completo), lo que permite medir la generalización. La partición de entrenamiento de CCT-20
+no contiene imágenes vacías; como el enunciado pide manejarlas como clase de fondo, se agregan 3,000
+vacías del Caltech Camera Traps completo (~70 % vacías). Las vacías de las cámaras de CCT-20 ya
+están todas en `cis_val` / `cis_test`, así que provienen de cámaras ajenas a CCT-20, nunca de
+cámaras *trans* ni de secuencias de CCT-20.
 
 ### Pipeline
 
 | Etapa | Script | Descripción |
 |---|---|---|
 | Entorno | `s00_verificar_entorno` | PyTorch y GPU, Ultralytics (inferencia de prueba) y archivos de CCT-20 |
+| Vacías de entrenamiento | `s01b_vacias_entrenamiento` | 3,000 vacías del dataset completo, de cámaras ajenas a CCT-20 (descarga y reducción a 1024 px) |
 | Inventario | `s01_inventario` | Imágenes con caja, vacías y ambiguas por partición, cámaras cis/trans y cajas por especie |
 | Conversión | `s02_convertir_yolo` | COCO Camera Traps a YOLO; vacías como imágenes de fondo; área relativa y proxy de oclusión por caja |
-| Entrenamiento | `s03_entrenar` | Lista por experimento (proporción de vacías y Repeat Factor Sampling), ajuste fino de YOLOv8, selección en cis_val |
+| Entrenamiento | `s03_entrenar` | Lista por experimento (vacías como fondo y, como extra, Repeat Factor Sampling), ajuste fino de YOLOv8, selección en cis_val |
 | Evaluación | `s04_evaluar` | mAP@0.5 y mAP@0.5:0.95 globales y por especie en cis/trans; presencia por imagen y falsos positivos en vacías; brecha cis - trans |
-| Ablación | `s05_ablacion` | Seis configuraciones (tabla abajo) |
+| Experimentos | `s05_ablacion` | Referencia y sin vacías; con `--extras`, cuatro configuraciones adicionales (tabla abajo) |
 | Desbalance | `s06_desbalance` | Prevalencias, AP por especie frente a su frecuencia, efecto de las vacías y del sobremuestreo |
 | Robustez | `s07_robustez` | Recall por caja y mAP según tamaño relativo y oclusión |
 | Fondo | `s08_fondo_gradcam` | Grad-CAM, concentración del mapa en el animal y prueba de enmascarado en cámaras vistas y nuevas |
-| Monitoreo | `s09_monitoreo` | Reglas sobre una cámara trans: MaxN por secuencia, eventos independientes (30 min), índice de abundancia relativa, actividad por periodo y franja horaria, validado con las etiquetas |
+| Monitoreo | `s09_monitoreo` | Reglas sobre una cámara trans: detecciones, especies distintas y tasa de vacías por especie y periodo; extras: MaxN por secuencia, eventos independientes (30 min), índice de abundancia relativa y franja horaria; validado con las etiquetas |
 | Exportación | `s10_exportar_resultados` | Copia de métricas, curvas, mapas y reportes a `p3_fauna/reports/` |
 
 ### Arquitectura
@@ -159,19 +164,24 @@ cuello PAN-FPN con salidas a tres escalas y cabeza desacoplada para caja y clase
 pesos preentrenados en COCO y se ajusta con AdamW, decaimiento coseno, mosaico (desactivado en las
 últimas épocas), mixup y variación de color para las imágenes nocturnas infrarrojas.
 
-### Experimentos de ablación
+### Experimentos
 
-| Experimento | Factor que varía |
-|---|---|
-| `A_yolov8n` | tamaño del modelo (nano) |
-| `B_yolov8s` | referencia |
-| `C_sin_vacias` | sin imágenes vacías como fondo |
-| `D_sin_rfs` | sin sobremuestreo de especies poco frecuentes |
-| `E_sin_mosaico` | sin aumento por mosaico ni mixup |
-| `F_img1024` | resolución de entrada 1024 px |
+| Experimento | Tipo | Factor que varía |
+|---|---|---|
+| `B_yolov8s` | enunciado | referencia: YOLOv8s, 640 px, vacías como fondo |
+| `C_sin_vacias` | enunciado | sin imágenes vacías como fondo |
+| `A_yolov8n` | extra | tamaño del modelo (nano) |
+| `D_con_rfs` | extra | sobremuestreo de especies poco frecuentes (Repeat Factor Sampling) |
+| `E_sin_mosaico` | extra | sin aumento por mosaico ni mixup |
+| `F_img1024` | extra | resolución de entrada 1024 px |
 
-Pipeline completo de la Pregunta 3: `python -m p3_fauna.run_all`; prueba con datos sintéticos:
-`python tests/smoke_test_p3.py`.
+Extras del análisis, además de lo que pide el enunciado: métricas de presencia por imagen y falsos
+positivos en vacías, prueba de enmascarado del animal y concentración del Grad-CAM en la caja (y una
+segunda capa en el cuello de la red), y las métricas ecológicas MaxN, eventos independientes e índice
+de abundancia relativa en el monitoreo.
+
+Pipeline completo de la Pregunta 3: `python -m p3_fauna.run_all` (con `--extras` también los
+experimentos adicionales); prueba con datos sintéticos: `python tests/smoke_test_p3.py`.
 
 ---
 
@@ -237,7 +247,7 @@ efectiva junto a sus resultados.
 │   ├── src/                 DICOM, etiquetado, dataset, modelos, pérdidas, métricas, Grad-CAM
 │   └── reports/             tablas, figuras y resultados exportados
 ├── p2_inundaciones/         Pregunta 2: config, run_all, scripts s00 a s13, src (U-Net, datos, métricas), snap
-├── p3_fauna/                Pregunta 3: config, run_all, scripts s00 a s10, src (COCO → YOLO, muestreo, métricas, Grad-CAM, monitoreo)
+├── p3_fauna/                Pregunta 3: config, run_all, scripts s00 a s10 (y s01b), src (COCO → YOLO, muestreo, métricas, Grad-CAM, monitoreo)
 ├── informe/                 artículos en formato NeurIPS
 ├── presentacion/            diapositivas
 └── tests/                   datos sintéticos y prueba de extremo a extremo

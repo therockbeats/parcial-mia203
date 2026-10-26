@@ -4,9 +4,9 @@ Etapa 6. Desbalance de clases.
 1. Prevalencia: cajas por especie en entrenamiento y prueba, y tasa de imágenes vacías.
 2. AP por especie frente al número de cajas de entrenamiento (escala logarítmica) y correlación
    de Spearman, en cámaras vistas y no vistas.
-3. Efecto de las decisiones de la ablación: imágenes vacías como fondo (``C_sin_vacias`` frente a
-   la referencia: falsos positivos en vacías y mAP) y Repeat Factor Sampling (``D_sin_rfs``:
-   diferencia de AP por especie).
+3. Efecto de las imágenes vacías como fondo (``C_sin_vacias`` frente a la referencia: falsos
+   positivos en vacías y mAP) y, si se ejecutó el extra ``D_con_rfs``, del Repeat Factor
+   Sampling (diferencia de AP por especie).
 
 Salidas en p3_fauna/reports/:
     figuras/prevalencia.png, figuras/ap_vs_frecuencia.png, tablas/prevalencia_por_particion.csv,
@@ -105,13 +105,13 @@ def main() -> None:
     if len(rows) == 2:
         pd.DataFrame(rows).to_csv(tables / "efecto_vacias.csv", index=False)
         log.info("Efecto de las vacías:\n" + pd.DataFrame(rows).round(4).to_string(index=False))
-    a, b = exp_dir(cfg, ref) / "por_especie.csv", exp_dir(cfg, "D_sin_rfs") / "por_especie.csv"
+    a, b = exp_dir(cfg, ref) / "por_especie.csv", exp_dir(cfg, "D_con_rfs") / "por_especie.csv"
     if a.exists() and b.exists():
         ra, rb = pd.read_csv(a, index_col=0), pd.read_csv(b, index_col=0)
         cols = [c for c in ("AP50_95_cis_test", "AP50_95_trans_test") if c in ra and c in rb]
-        eff = ra[["cajas_train"]].join((ra[cols] - rb[cols]).add_prefix("delta_rfs_")).sort_values("cajas_train")
+        eff = ra[["cajas_train"]].join((rb[cols] - ra[cols]).add_prefix("delta_rfs_")).sort_values("cajas_train")
         eff.to_csv(tables / "efecto_rfs_por_especie.csv")
-        log.info("Ganancia de AP por RFS (referencia - sin RFS), de menos a más frecuente:\n" + eff.round(3).to_string())
+        log.info("Ganancia de AP por RFS (con RFS - referencia), de menos a más frecuente:\n" + eff.round(3).to_string())
 
 
 if __name__ == "__main__":

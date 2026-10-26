@@ -2,7 +2,7 @@
 Etapa 10. Exportación de resultados al repositorio.
 
 Copia a ``p3_fauna/reports/resultados/<exp>/`` las métricas, el historial de entrenamiento, los
-registros, la configuración y las matrices de confusión de cada experimento de la ablación, y del
+registros, la configuración y las matrices de confusión de cada experimento evaluado, y del
 experimento final además las carpetas de robustez, fondo (Grad-CAM) y monitoreo. Los pesos no se
 copian.
 
@@ -17,7 +17,7 @@ from pathlib import Path
 
 from common.config import REPO_ROOT, load_config
 from common.utils import ensure_dir, get_logger
-from p3_fauna.src.experimentos import best_experiment, exp_dir
+from p3_fauna.src.experimentos import all_experiments, best_experiment, exp_dir
 
 FILES = ["metricas.csv", "por_especie.csv", "history.csv", "summary.json", "muestreo.json", "config.yaml",
          "train.log", "eval.log", "results.png", "confusion_cis_test.png", "confusion_trans_test.png"]
@@ -35,7 +35,7 @@ def main() -> None:
     final = args.exp or best_experiment(cfg)[0]
     dest_root = ensure_dir(Path(cfg["data"]["reports_dir"]) / "resultados")
     n = 0
-    for e in cfg["ablation"]["experiments"]:
+    for e in all_experiments(cfg):
         src = exp_dir(cfg, e["name"])
         if not (src / "summary.json").exists():
             continue

@@ -76,3 +76,16 @@ def ultralytics_device(prefer: str | int = "auto"):
     if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
         return "mps"
     return "cpu"
+
+
+def predict_paths(model, paths: list[str], batch: int = 16, **kwargs):
+    """
+    Predice sobre una lista de rutas por lotes y devuelve pares (ruta, resultado).
+
+    Ultralytics carga en memoria todas las imágenes cuando recibe una lista, lo que agota la RAM
+    con miles de imágenes; aquí cada llamada recibe solo ``batch`` rutas.
+    """
+    for i in range(0, len(paths), batch):
+        chunk = paths[i:i + batch]
+        for path, r in zip(chunk, model.predict(chunk, verbose=False, **kwargs)):
+            yield path, r

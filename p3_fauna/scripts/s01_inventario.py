@@ -21,7 +21,7 @@ import pandas as pd
 
 from common.config import REPO_ROOT, load_config
 from common.utils import ensure_dir, get_logger
-from p3_fauna.src.cct import CCTSplit, class_names
+from p3_fauna.src.cct import class_names, load_splits, split_paths
 from p3_fauna.src.monitoreo import df_to_md
 
 
@@ -36,7 +36,7 @@ def main() -> None:
     reports = Path(cfg["data"]["reports_dir"])
     tables = ensure_dir(reports / "tablas")
 
-    splits = {n: CCTSplit(ann_dir / f, cfg["dataset"]["empty_category"]) for n, f in cfg["dataset"]["split_files"].items()}
+    splits = load_splits(cfg)
     names = class_names(list(splits.values()))
     rows, boxes, cams = [], [], []
     for name, s in splits.items():
@@ -71,8 +71,12 @@ def main() -> None:
 
     md = ["# Inventario de datos: Caltech Camera Traps (CCT-20)", "",
           f"Imágenes: `{img_dir}`", f"Anotaciones: `{ann_dir}`", "",
+          "Archivos por partición: " + "; ".join(f"`{n}`: " + ", ".join(x.name for x in split_paths(cfg, n))
+                                                 for n in splits), "",
           "## Imágenes por partición", "", df_to_md(inv), "",
-          "Ambiguas: imágenes con etiqueta de animal sin caja; se excluyen de la detección.", "",
+          "Ambiguas: imágenes con etiqueta de animal sin caja; se excluyen de la detección. La partición "
+          "train de CCT-20 no trae vacías; las de `train_vacias_annotations.json` provienen del Caltech "
+          "Camera Traps completo, de cámaras ajenas a CCT-20 y nunca de cámaras trans (etapa 1b).", "",
           "## Cámaras (cis = vistas en entrenamiento, trans = no vistas)", "", *checks, "",
           f"## Cajas por especie ({len(names)} especies)", "", df_to_md(per_sp)]
     (reports / "inventario_datos.md").write_text("\n".join(md) + "\n", encoding="utf-8")

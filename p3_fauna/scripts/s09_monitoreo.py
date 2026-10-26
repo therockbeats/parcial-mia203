@@ -7,7 +7,7 @@ independientes, índice de abundancia relativa, actividad por periodo y franja h
 el mismo reporte con las etiquetas de referencia para comparar.
 
 Salidas en <runs_dir>/<exp>/monitoreo/:
-    reporte_camara_<id>.md, por_especie.csv, por_periodo.csv, por_franja.csv, eventos.csv,
+    reporte_camara_<id>.md, por_especie.csv, por_periodo.csv, resumen_por_periodo.csv, por_franja.csv, eventos.csv,
     detecciones.csv, validacion.csv
 
 Uso:
@@ -25,14 +25,14 @@ from common.config import REPO_ROOT, load_config
 from common.utils import ensure_dir, get_logger
 from p3_fauna.src.experimentos import best_experiment, exp_dir, load_exp_config, weights
 from p3_fauna.src.monitoreo import build_report, report_markdown
-from p3_fauna.src.yolo_io import class_names_from_yolo, read_labels, ultralytics_device
+from p3_fauna.src.yolo_io import class_names_from_yolo, predict_paths, read_labels, ultralytics_device
 
 
 def predict_frames(model, frames: list[str], cfg: dict, device) -> pd.DataFrame:
     rows = []
-    res = model.predict(frames, imgsz=cfg["train"]["imgsz"], conf=cfg["eval"]["deploy_conf"], device=device,
-                        stream=True, verbose=False)
-    for path, r in zip(frames, res):
+    res = predict_paths(model, frames, int(cfg["eval"]["batch"]), imgsz=cfg["train"]["imgsz"],
+                        conf=cfg["eval"]["deploy_conf"], device=device)
+    for path, r in res:
         cls, conf = r.boxes.cls.cpu().numpy().astype(int), r.boxes.conf.cpu().numpy()
         if len(cls) == 0:
             rows.append({"image": path, "species": None, "conf": np.nan})
@@ -84,6 +84,7 @@ def main() -> None:
     (out / f"reporte_camara_{cam}.md").write_text(md, encoding="utf-8")
     pred["by_species"].to_csv(out / "por_especie.csv", index=False)
     pred["by_period"].to_csv(out / "por_periodo.csv", index=False)
+    pred["by_period_summary"].to_csv(out / "resumen_por_periodo.csv")
     pred["by_hour"].to_csv(out / "por_franja.csv")
     pred["events"].to_csv(out / "eventos.csv", index=False)
     if cmp is not None:

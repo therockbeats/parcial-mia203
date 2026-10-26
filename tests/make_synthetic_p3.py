@@ -3,8 +3,13 @@ Datos sintéticos con la estructura de CCT-20 (LILA BC).
 
 Genera imágenes JPEG con un fondo fijo por cámara y animales dibujados como figuras de color por
 especie, y los cinco JSON en formato COCO Camera Traps (train, cis_val, trans_val, cis_test,
-trans_test) con imágenes vacías, imágenes ambiguas (animal sin caja), secuencias y fechas. La
-resolución declarada en el JSON es el doble de la real, como prueba del reescalado de cajas.
+trans_test) con imágenes vacías, imágenes ambiguas (animal sin caja), secuencias y fechas. Como en
+CCT-20 real, la partición train no tiene vacías. La resolución declarada en el JSON es el doble de
+la real, como prueba del reescalado de cajas.
+
+También genera un "dataset completo" (caltech_images_sintetico.json y la carpeta cct_images_full/)
+con vacías adicionales en cámaras de entrenamiento y trans, y vacías de secuencias que ya están en
+CCT-20, para probar la etapa 1b y sus exclusiones.
 
 Uso:
     python tests/make_synthetic_p3.py --out <data_root>
@@ -45,6 +50,8 @@ def make_split(name: str, cams: list[str], n: int, img_dir: Path, rng) -> dict:
         img = Image.fromarray(background(cam))
         draw = ImageDraw.Draw(img)
         r = rng.random()
+        if name == "train" and r < 0.45:   # CCT-20 real: sin vacías en train
+            r = 0.45 + 0.5 * rng.random()
         if r < 0.45:
             anns.append({"id": f"a{iid}", "image_id": iid, "category_id": 30})
         else:
@@ -73,10 +80,31 @@ def main() -> None:
     img_dir.mkdir(parents=True, exist_ok=True)
     ann_dir.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(0)
+    full_images, full_anns = [], []
     for name, (cams, n) in SPLITS.items():
         d = make_split(name, cams, n, img_dir, rng)
         (ann_dir / f"{name}_annotations.json").write_text(json.dumps(d), encoding="utf-8")
+        full_images += d["images"]
+        full_anns += d["annotations"]
         print(f"{name}: {n} imágenes, cámaras {cams}")
+
+    # Dataset completo: vacías extra (a mayor resolución) en cámaras de train y trans
+    full_dir = raw / "cct_images_full"
+    full_dir.mkdir(parents=True, exist_ok=True)
+    t0 = datetime(2014, 1, 1, 0, 0)
+    for i, cam in enumerate(["10"] * 30 + ["20"] * 20 + ["30"] * 10 + ["80"] * 15):
+        iid = f"full_vacia_{i:04d}"
+        # las 5 primeras reutilizan una secuencia de CCT-20 y deben excluirse
+        seq = full_images[i]["seq_id"] if i < 5 else f"seq_full_{i // 3}"
+        Image.fromarray(np.kron(background(cam), np.ones((2, 2, 1), np.uint8))).save(full_dir / f"{iid}.jpg")
+        full_images.append({"id": iid, "file_name": f"{iid}.jpg", "width": 2 * W, "height": 2 * H, "location": int(cam),
+                            "date_captured": (t0 + timedelta(minutes=41 * i)).strftime("%Y-%m-%d %H:%M:%S"),
+                            "seq_id": seq, "frame_num": 0})
+        full_anns.append({"id": f"a{iid}", "image_id": iid, "category_id": 30})
+    full = {"info": {"description": "Caltech Camera Traps completo sintético"}, "images": full_images,
+            "annotations": full_anns, "categories": CATEGORIES}
+    (raw / "caltech_images_sintetico.json").write_text(json.dumps(full), encoding="utf-8")
+    print(f"dataset completo: {len(full_images)} imágenes")
 
 
 if __name__ == "__main__":

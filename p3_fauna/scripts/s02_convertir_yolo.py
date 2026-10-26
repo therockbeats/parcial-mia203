@@ -27,7 +27,7 @@ from PIL import Image
 
 from common.config import REPO_ROOT, load_config
 from common.utils import ensure_dir, get_logger
-from p3_fauna.src.cct import CCTSplit, class_names, occlusion_level, occlusion_proxy
+from p3_fauna.src.cct import class_names, load_splits, occlusion_level, occlusion_proxy
 from p3_fauna.src.yolo_io import label_path, link_file, write_data_yaml
 
 
@@ -85,7 +85,7 @@ def main() -> None:
     log = get_logger("s02")
     ann_dir = Path(cfg["data"]["raw_dir"]) / cfg["data"]["annotations_subdir"]
     out = ensure_dir(cfg["data"]["yolo_dir"])
-    splits = {n: CCTSplit(ann_dir / f, cfg["dataset"]["empty_category"]) for n, f in cfg["dataset"]["split_files"].items()}
+    splits = load_splits(cfg)
     names = class_names(list(splits.values()))
     cls_index = {n: i for i, n in enumerate(names)}
     log.info(f"{len(names)} especies: {', '.join(names)}")

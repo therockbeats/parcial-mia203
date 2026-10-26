@@ -32,11 +32,17 @@ def read_summary(cfg: dict, exp: str) -> dict | None:
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
 
 
+def all_experiments(cfg: dict, extras: bool = True) -> list[dict]:
+    """Experimentos exigidos y, si ``extras``, también los adicionales."""
+    ab = cfg["ablation"]
+    return list(ab["experiments"]) + (list(ab.get("extra_experiments") or []) if extras else [])
+
+
 def best_experiment(cfg: dict) -> tuple[str | None, float]:
-    """Mejor experimento de la ablación según mAP@0.5:0.95 en la partición de selección (cis_val)."""
+    """Mejor experimento evaluado según mAP@0.5:0.95 en la partición de selección (cis_val)."""
     key = f"map50_95_{cfg['eval']['select_split']}"
     best, best_v = None, -1.0
-    for e in cfg["ablation"]["experiments"]:
+    for e in all_experiments(cfg):
         s = read_summary(cfg, e["name"])
         v = (s or {}).get(key, float("nan"))
         if v == v and v > best_v:

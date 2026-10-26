@@ -15,17 +15,22 @@ from pathlib import Path
 
 
 class CCTSplit:
-    """Una partición de CCT-20 cargada desde su JSON."""
+    """Una partición de CCT-20 cargada desde uno o varios JSON (los adicionales se suman)."""
 
-    def __init__(self, json_path: str | Path, empty_name: str = "empty"):
-        with open(json_path, encoding="utf-8") as f:
-            d = json.load(f)
-        self.images = {im["id"]: im for im in d["images"]}
-        self.categories = {c["id"]: c["name"] for c in d["categories"]}
+    def __init__(self, json_paths: str | Path | list, empty_name: str = "empty"):
+        paths = json_paths if isinstance(json_paths, (list, tuple)) else [json_paths]
+        self.images, self.categories, self.anns = {}, {}, defaultdict(list)
+        for p in paths:
+            with open(p, encoding="utf-8") as f:
+                d = json.load(f)
+            self.images.update({im["id"]: im for im in d["images"]})
+            for c in d["categories"]:
+                if self.categories.get(c["id"], c["name"]) != c["name"]:
+                    raise ValueError(f"{p}: la categoría {c['id']} no coincide con la de CCT-20")
+                self.categories[c["id"]] = c["name"]
+            for a in d["annotations"]:
+                self.anns[a["image_id"]].append(a)
         self.empty_ids = {cid for cid, n in self.categories.items() if n.lower() == empty_name}
-        self.anns = defaultdict(list)
-        for a in d["annotations"]:
-            self.anns[a["image_id"]].append(a)
 
     def species_names(self) -> set[str]:
         return {n for cid, n in self.categories.items() if cid not in self.empty_ids}
@@ -46,6 +51,17 @@ class CCTSplit:
             else:
                 ambiguous.append(img_id)
         return with_box, empty, ambiguous
+
+
+def split_paths(cfg: dict, name: str, existing_only: bool = True) -> list[Path]:
+    """JSON de una partición: el oficial de CCT-20 más los adicionales de ``dataset.extra_files``."""
+    ann_dir = Path(cfg["data"]["raw_dir"]) / cfg["data"]["annotations_subdir"]
+    extra = [ann_dir / f for f in (cfg["dataset"].get("extra_files") or {}).get(name, [])]
+    return [ann_dir / cfg["dataset"]["split_files"][name]] + [p for p in extra if p.exists() or not existing_only]
+
+
+def load_splits(cfg: dict) -> dict[str, CCTSplit]:
+    return {n: CCTSplit(split_paths(cfg, n), cfg["dataset"]["empty_category"]) for n in cfg["dataset"]["split_files"]}
 
 
 def class_names(splits: list[CCTSplit]) -> list[str]:

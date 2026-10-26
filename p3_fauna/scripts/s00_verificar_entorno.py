@@ -59,6 +59,16 @@ def main() -> None:
         for name, f in cfg["dataset"]["split_files"].items():
             p = raw / cfg["data"]["annotations_subdir"] / f
             print(f"  {name:12s}: {'OK' if p.exists() else 'FALTA'} ({f})")
+        from p3_fauna.scripts.s01b_vacias_entrenamiento import find_metadata
+
+        vac = raw / cfg["data"]["annotations_subdir"] / "train_vacias_annotations.json"
+        if vac.exists():
+            print(f"Vacías de train    : OK ({vac.name}, etapa 1b ya ejecutada)")
+        else:
+            try:
+                print(f"Vacías de train    : pendiente; anotaciones del dataset completo -> {find_metadata(cfg).name}")
+            except FileNotFoundError:
+                print("Vacías de train    : FALTA el archivo 'Image-level annotations' del dataset completo en raw/")
     except FileNotFoundError as e:
         print(f"Rutas             : {e}")
     print("=" * 70)

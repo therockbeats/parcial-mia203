@@ -1,0 +1,6 @@
+particion,imagenes,con_caja,vacias,ambiguas,pct_vacias,cajas,camaras,en_disco
+train,16553,12099,3000,1454,18.1,12617,116,16553
+cis_val,3484,1665,995,824,28.6,1763,10,3484
+trans_val,1725,1533,61,131,3.5,1673,1,1725
+cis_test,15827,12696,1180,1951,7.5,13264,10,15827
+trans_test,23275,18033,1778,3464,7.6,18786,9,23275

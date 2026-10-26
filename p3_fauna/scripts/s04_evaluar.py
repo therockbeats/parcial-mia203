@@ -29,14 +29,14 @@ from common.config import REPO_ROOT, load_config
 from common.utils import get_logger
 from p3_fauna.src.experimentos import exp_dir, load_exp_config, weights
 from p3_fauna.src.metrics import presence_scores
-from p3_fauna.src.yolo_io import read_labels, ultralytics_device
+from p3_fauna.src.yolo_io import predict_paths, read_labels, ultralytics_device
 
 
 def presence_table(model, images: list[str], cfg: dict, device) -> pd.DataFrame:
     rows = []
-    res = model.predict(images, imgsz=cfg["train"]["imgsz"], conf=cfg["eval"]["deploy_conf"], device=device,
-                        stream=True, verbose=False)
-    for path, r in zip(images, res):
+    res = predict_paths(model, images, int(cfg["eval"]["batch"]), imgsz=cfg["train"]["imgsz"],
+                        conf=cfg["eval"]["deploy_conf"], device=device)
+    for path, r in res:
         gt = set(read_labels(path)[:, 0].astype(int).tolist())
         cls = r.boxes.cls.cpu().numpy().astype(int)
         conf = r.boxes.conf.cpu().numpy()

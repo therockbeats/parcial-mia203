@@ -1,8 +1,10 @@
 """
 Etapa 5. Ablación.
 
-Entrena (etapa 3) y evalúa (etapa 4) cada experimento de ``ablation.experiments`` con sus
-overrides; los experimentos ya evaluados se omiten salvo con ``--rehacer``. Resume los resultados
+Entrena (etapa 3) y evalúa (etapa 4) cada experimento de ``ablation.experiments`` (los que pide
+el enunciado: referencia y sin vacías) y, con ``--extras``, también ``ablation.extra_experiments``.
+Los experimentos ya evaluados se omiten y los ya entrenados (con weights/best.pt) solo se evalúan,
+salvo con ``--rehacer``. Resume los resultados
 en una tabla con la diferencia frente a la referencia y una figura de mAP en cámaras vistas y no
 vistas.
 
@@ -11,7 +13,8 @@ Salidas en p3_fauna/reports/:
 
 Uso:
     python -m p3_fauna.scripts.s05_ablacion
-    python -m p3_fauna.scripts.s05_ablacion --solo B_yolov8s C_sin_vacias
+    python -m p3_fauna.scripts.s05_ablacion --solo B_yolov8s
+    python -m p3_fauna.scripts.s05_ablacion --extras
 """
 from __future__ import annotations
 
@@ -29,7 +32,7 @@ import pandas as pd
 
 from common.config import REPO_ROOT, load_config
 from common.utils import ensure_dir, get_logger
-from p3_fauna.src.experimentos import read_summary
+from p3_fauna.src.experimentos import all_experiments, exp_dir, read_summary
 
 
 def run(module: str, *extra: str) -> None:
@@ -41,23 +44,32 @@ def main() -> None:
     ap.add_argument("--config", default=str(REPO_ROOT / "p3_fauna" / "config.yaml"))
     ap.add_argument("--solo", nargs="*", default=None)
     ap.add_argument("--rehacer", action="store_true")
+    ap.add_argument("--extras", action="store_true", help="incluir los experimentos adicionales")
     args = ap.parse_args()
     cfg = load_config(args.config)
     log = get_logger("s05")
-    exps = [e for e in cfg["ablation"]["experiments"] if not args.solo or e["name"] in args.solo]
+    pool = all_experiments(cfg, extras=args.extras or bool(args.solo))
+    exps = [e for e in pool if not args.solo or e["name"] in args.solo]
     for e in exps:
         if read_summary(cfg, e["name"]) and not args.rehacer:
             log.info(f"{e['name']}: ya evaluado; se omite")
             continue
         sets = [x for s in e.get("set", []) for x in ("--set", s)]
-        run("p3_fauna.scripts.s03_entrenar", "--config", args.config, "--exp", e["name"], *sets)
+        trained = (exp_dir(cfg, e["name"]) / "weights" / "best.pt").exists() and \
+                  (exp_dir(cfg, e["name"]) / "config.yaml").exists()
+        if trained and not args.rehacer:
+            log.info(f"{e['name']}: ya entrenado (weights/best.pt); solo se evalúa")
+        else:
+            run("p3_fauna.scripts.s03_entrenar", "--config", args.config, "--exp", e["name"], *sets)
         run("p3_fauna.scripts.s04_evaluar", "--config", args.config, "--exp", e["name"])
 
     rows = []
-    for e in cfg["ablation"]["experiments"]:
+    required = {e["name"] for e in cfg["ablation"]["experiments"]}
+    for e in all_experiments(cfg):
         s = read_summary(cfg, e["name"])
         if s:
-            rows.append({"experimento": e["name"], "cambio": "; ".join(e.get("set", [])) or "referencia",
+            rows.append({"experimento": e["name"], "tipo": "enunciado" if e["name"] in required else "extra",
+                         "cambio": "; ".join(e.get("set", [])) or "referencia",
                          **{k: v for k, v in s.items() if k not in ("exp", "deploy_conf")}})
     if not rows:
         log.info("Sin experimentos evaluados")
