@@ -1,0 +1,9 @@
+23:51:38 | INFO | Capa 9: 800 imágenes
+23:52:28 | INFO | Capa 15: 800 imágenes
+23:52:28 | INFO | 
+ capa  particion  imagenes  concentracion_mediana  frac_concentracion_mayor_1 tasa_especie_sin_animal
+    9   cis_test       400                  0.836                       0.395                  0.0475
+    9 trans_test       400                  0.685                       0.285                  0.0425
+   15   cis_test       400                  1.152                       0.578                     NaN
+   15 trans_test       400                  1.254                       0.625                     NaN
+23:52:28 | INFO | Lectura: menor concentración en trans y una tasa alta de 'especie sin animal' en cis indican que el modelo se apoya en el fondo de las cámaras conocidas.

@@ -1,0 +1,14 @@
+23:48:18 | INFO | 
+ particion   factor   grupo  cajas  recall  imagenes_puras  mAP50  mAP50_95
+  cis_test   tamaño  grande    381   0.906            1584  0.618     0.487
+  cis_test   tamaño mediano   2483   0.861           10097  0.822     0.536
+  cis_test   tamaño pequeño    255   0.663             888  0.501     0.259
+  cis_test oclusion    alto    526   0.817            2156  0.773     0.543
+  cis_test oclusion    bajo   2572   0.861           10431  0.746     0.477
+  cis_test oclusion   medio     21   0.429              19  0.463     0.245
+trans_test   tamaño  grande    443   0.571            2545  0.247     0.210
+trans_test   tamaño mediano   2372   0.751           13591  0.536     0.333
+trans_test   tamaño pequeño    321   0.414            1683  0.310     0.159
+trans_test oclusion    alto    588   0.532            3464  0.289     0.222
+trans_test oclusion    bajo   2532   0.728           14411  0.502     0.313
+trans_test oclusion   medio     16   0.625              25  0.306     0.170

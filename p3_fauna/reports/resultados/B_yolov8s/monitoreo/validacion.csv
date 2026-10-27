@@ -1,0 +1,13 @@
+species,detecciones_modelo,eventos_modelo,maxN_modelo,detecciones_referencia,eventos_referencia,maxN_referencia
+badger,0.0,0.0,0.0,3,1,1
+bird,15.0,11.0,2.0,57,20,7
+bobcat,660.0,245.0,2.0,812,225,3
+cat,201.0,114.0,2.0,17,5,1
+coyote,602.0,159.0,3.0,739,128,3
+dog,19.0,12.0,1.0,26,4,1
+opossum,1010.0,321.0,1.0,1105,319,2
+rabbit,350.0,126.0,2.0,496,134,2
+raccoon,262.0,103.0,2.0,985,150,2
+rodent,2.0,2.0,1.0,15,7,1
+skunk,396.0,136.0,2.0,84,28,2
+squirrel,19.0,14.0,2.0,10,4,1

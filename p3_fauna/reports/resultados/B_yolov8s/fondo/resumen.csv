@@ -1,0 +1,5 @@
+capa,particion,imagenes,concentracion_mediana,frac_concentracion_mayor_1,tasa_especie_sin_animal
+9,cis_test,400,0.835691506139986,0.395,0.0475
+9,trans_test,400,0.6847127198831793,0.285,0.0425
+15,cis_test,400,1.1522128654427257,0.5775,
+15,trans_test,400,1.2541975286773561,0.625,

@@ -8,12 +8,14 @@ temprana y mejor modelo) usa ``eval.select_split`` (cis_val): las cámaras trans
 para medir la generalización.
 
 Salidas en <runs_dir>/<exp>/:
-    weights/best.pt, history.csv, config.yaml, train.txt, data.yaml, muestreo.json, train.log
+    weights/best.pt, history.csv, config.yaml, train.txt, data.yaml, muestreo.json, train.log,
+    entrenamiento_completo.json (marca de entrenamiento terminado)
     (más los archivos propios de Ultralytics: args.yaml, results.csv, results.png, ...)
 
 Uso:
     python -m p3_fauna.scripts.s03_entrenar --exp B_yolov8s
     python -m p3_fauna.scripts.s03_entrenar --exp prueba --set train.epochs=1 --set train.imgsz=320
+    python -m p3_fauna.scripts.s03_entrenar --exp C_sin_vacias --reanudar   # tras interrumpir con Ctrl+C
 """
 from __future__ import annotations
 
@@ -36,6 +38,7 @@ def main() -> None:
     ap.add_argument("--config", default=str(REPO_ROOT / "p3_fauna" / "config.yaml"))
     ap.add_argument("--exp", required=True)
     ap.add_argument("--set", action="append", default=[], help="override seccion.clave=valor (repetible)")
+    ap.add_argument("--reanudar", action="store_true", help="continuar desde weights/last.pt si existe")
     args = ap.parse_args()
     cfg = load_config(args.config, args.set)
     seed = int(cfg.get("seed", 42))
@@ -65,8 +68,16 @@ def main() -> None:
     model_name, device = t.pop("model"), ultralytics_device(t.pop("device", "auto"))
     log.info(f"Modelo {model_name} | dispositivo {device} | imgsz {t['imgsz']} | épocas {t['epochs']} | lote {t['batch']}")
     t0 = time.time()
-    YOLO(model_name).train(data=str(data_yaml), project=str(out.parent), name=args.exp, exist_ok=True,
-                           device=device, seed=seed, deterministic=True, verbose=False, **t)
+    last = out / "weights" / "last.pt"
+    if args.reanudar and last.exists():
+        log.info(f"Reanudando desde {last}")
+        try:
+            YOLO(str(last)).train(resume=True)
+        except AssertionError as err:   # el entrenamiento ya había terminado
+            log.info(f"Nada que reanudar: {err}")
+    else:
+        YOLO(model_name).train(data=str(data_yaml), project=str(out.parent), name=args.exp, exist_ok=True,
+                               device=device, seed=seed, deterministic=True, verbose=False, **t)
     if (out / "results.csv").exists():
         hist = pd.read_csv(out / "results.csv")
         hist.columns = [c.strip() for c in hist.columns]
@@ -77,6 +88,8 @@ def main() -> None:
             log.info(f"Mejor época {int(hist.loc[i, 'epoch'])}: mAP@0.5:0.95 {cfg['eval']['select_split']} {hist.loc[i, col]:.4f}")
     if not (out / "weights" / "best.pt").exists() and (out / "weights" / "last.pt").exists():
         shutil.copy2(out / "weights" / "last.pt", out / "weights" / "best.pt")
+    (out / "entrenamiento_completo.json").write_text(json.dumps({"exp": args.exp, "minutos": round(
+        (time.time() - t0) / 60, 1)}), encoding="utf-8")
     log.info(f"Entrenamiento: {(time.time() - t0) / 60:.1f} min. Pesos en {out / 'weights' / 'best.pt'}")
 
 

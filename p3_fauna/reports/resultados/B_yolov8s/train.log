@@ -1,0 +1,4 @@
+21:44:18 | INFO | Experimento B_yolov8s | entrenamiento: 12,099 con animal + 3,000 vacías -> 15,099 entradas por época (RFS no) | validación: cis_val.txt
+21:44:19 | INFO | Modelo yolov8s.pt | dispositivo 0 | imgsz 640 | épocas 40 | lote 16
+01:05:45 | INFO | Mejor época 35: mAP@0.5:0.95 cis_val 0.6410
+01:05:45 | INFO | Entrenamiento: 201.4 min. Pesos en C:\Users\USUARIO\MIA203\runs\p3\B_yolov8s\weights\best.pt

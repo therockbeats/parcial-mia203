@@ -1,0 +1,6 @@
+18:18:41 | INFO | Experimento C_sin_vacias | entrenamiento: 12,099 con animal + 0 vacías -> 12,099 entradas por época (RFS no) | validación: cis_val.txt
+18:18:41 | INFO | Modelo yolov8s.pt | dispositivo 0 | imgsz 640 | épocas 40 | lote 16
+19:49:47 | INFO | Experimento C_sin_vacias | entrenamiento: 12,099 con animal + 0 vacías -> 12,099 entradas por época (RFS no) | validación: cis_val.txt
+19:49:47 | INFO | Modelo yolov8s.pt | dispositivo 0 | imgsz 640 | épocas 40 | lote 16
+22:32:11 | INFO | Mejor época 37: mAP@0.5:0.95 cis_val 0.6272
+22:32:11 | INFO | Entrenamiento: 162.4 min. Pesos en C:\Users\USUARIO\MIA203\runs\p3\C_sin_vacias\weights\best.pt

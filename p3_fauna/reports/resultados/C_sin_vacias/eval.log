@@ -1,0 +1,8 @@
+22:56:38 | INFO | 
+                   particion  mAP50  mAP50_95  precision  recall  recall_presencia  fp_en_vacias  especie_correcta
+                     cis_val 0.8611    0.6253     0.8834  0.8354               NaN           NaN               NaN
+                   trans_val 0.5136    0.3710     0.6304  0.4622               NaN           NaN               NaN
+                    cis_test 0.7615    0.5165     0.8448  0.7359            0.9485         0.178            0.8774
+                  trans_test 0.4645    0.3159     0.5251  0.5156            0.9025         0.225            0.7240
+  brecha cis_val - trans_val 0.3475    0.2543     0.2530  0.3733               NaN           NaN               NaN
+brecha cis_test - trans_test 0.2970    0.2006     0.3197  0.2202            0.0460        -0.047            0.1535

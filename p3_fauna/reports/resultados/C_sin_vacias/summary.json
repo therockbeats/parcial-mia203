@@ -1,0 +1,20 @@
+{
+  "exp": "C_sin_vacias",
+  "deploy_conf": 0.35,
+  "map50_cis_val": 0.8610728346082199,
+  "map50_95_cis_val": 0.6253179200322405,
+  "map50_trans_val": 0.5135757547294885,
+  "map50_95_trans_val": 0.3709874066244941,
+  "map50_cis_test": 0.761494404437281,
+  "map50_95_cis_test": 0.5164541979692395,
+  "fp_vacias_cis_test": 0.17796610169491525,
+  "recall_presencia_cis_test": 0.9484877126654064,
+  "map50_trans_test": 0.46450161263490625,
+  "map50_95_trans_test": 0.3158871425228785,
+  "fp_vacias_trans_test": 0.2249718785151856,
+  "recall_presencia_trans_test": 0.9024566073310043,
+  "brecha_map50_val": 0.34749707987873146,
+  "brecha_map50_95_val": 0.25433051340774643,
+  "brecha_map50_test": 0.29699279180237476,
+  "brecha_map50_95_test": 0.20056705544636105
+}

@@ -3,8 +3,8 @@ Etapa 5. Ablación.
 
 Entrena (etapa 3) y evalúa (etapa 4) cada experimento de ``ablation.experiments`` (los que pide
 el enunciado: referencia y sin vacías) y, con ``--extras``, también ``ablation.extra_experiments``.
-Los experimentos ya evaluados se omiten y los ya entrenados (con weights/best.pt) solo se evalúan,
-salvo con ``--rehacer``. Resume los resultados
+Los experimentos ya evaluados se omiten, los ya entrenados solo se evalúan y los interrumpidos
+(con weights/last.pt) se reanudan desde la última época guardada, salvo con ``--rehacer``. Resume los resultados
 en una tabla con la diferencia frente a la referencia y una figura de mAP en cámaras vistas y no
 vistas.
 
@@ -55,10 +55,12 @@ def main() -> None:
             log.info(f"{e['name']}: ya evaluado; se omite")
             continue
         sets = [x for s in e.get("set", []) for x in ("--set", s)]
-        trained = (exp_dir(cfg, e["name"]) / "weights" / "best.pt").exists() and \
-                  (exp_dir(cfg, e["name"]) / "config.yaml").exists()
-        if trained and not args.rehacer:
-            log.info(f"{e['name']}: ya entrenado (weights/best.pt); solo se evalúa")
+        d = exp_dir(cfg, e["name"])
+        if (d / "entrenamiento_completo.json").exists() and not args.rehacer:
+            log.info(f"{e['name']}: ya entrenado; solo se evalúa")
+        elif (d / "weights" / "last.pt").exists() and not args.rehacer:
+            log.info(f"{e['name']}: entrenamiento interrumpido; se reanuda desde weights/last.pt")
+            run("p3_fauna.scripts.s03_entrenar", "--config", args.config, "--exp", e["name"], *sets, "--reanudar")
         else:
             run("p3_fauna.scripts.s03_entrenar", "--config", args.config, "--exp", e["name"], *sets)
         run("p3_fauna.scripts.s04_evaluar", "--config", args.config, "--exp", e["name"])

@@ -1,0 +1,20 @@
+{
+  "exp": "B_yolov8s",
+  "deploy_conf": 0.35,
+  "map50_cis_val": 0.9394843263431838,
+  "map50_95_cis_val": 0.6402394667511319,
+  "map50_trans_val": 0.5461327361940556,
+  "map50_95_trans_val": 0.3865948989580034,
+  "map50_cis_test": 0.7572734753391359,
+  "map50_95_cis_test": 0.5090083059366236,
+  "fp_vacias_cis_test": 0.044915254237288135,
+  "recall_presencia_cis_test": 0.9360428481411468,
+  "map50_trans_test": 0.4934759817891346,
+  "map50_95_trans_test": 0.33410166763484983,
+  "fp_vacias_trans_test": 0.047806524184476944,
+  "recall_presencia_trans_test": 0.8412355126712139,
+  "brecha_map50_val": 0.39335159014912824,
+  "brecha_map50_95_val": 0.25364456779312844,
+  "brecha_map50_test": 0.2637974935500013,
+  "brecha_map50_95_test": 0.17490663830177378
+}

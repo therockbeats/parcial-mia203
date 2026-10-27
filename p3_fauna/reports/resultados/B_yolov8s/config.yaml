@@ -1,0 +1,124 @@
+seed: 42
+data:
+  raw_dir: C:/Users/USUARIO/MIA203/data/p3_cct20/raw
+  images_subdir: eccv_18_all_images_sm
+  annotations_subdir: eccv_18_annotation_files
+  yolo_dir: C:/Users/USUARIO/MIA203/data/p3_cct20/yolo
+  runs_dir: C:/Users/USUARIO/MIA203/runs/p3
+  reports_dir: C:/Users/USUARIO/Desktop/DEVELOPER_FOLDER/REDESNEURONALES/parcial-mia203/p3_fauna/reports
+dataset:
+  split_files:
+    train: train_annotations.json
+    cis_val: cis_val_annotations.json
+    trans_val: trans_val_annotations.json
+    cis_test: cis_test_annotations.json
+    trans_test: trans_test_annotations.json
+  empty_category: empty
+  link_mode: hardlink
+  extra_files:
+    train:
+    - train_vacias_annotations.json
+empties:
+  full_metadata: null
+  image_base: https://lilawildlife.blob.core.windows.net/lila-wildlife/caltech-unzipped/cct_images
+  n_images: 3000
+  solo_camaras_train: false
+  max_side: 1024
+  workers: 16
+sampling:
+  empty_ratio_train: 0.25
+  repeat_factor_sampling: false
+  rfs_threshold: 0.1
+train:
+  model: yolov8s.pt
+  device: auto
+  imgsz: 640
+  epochs: 40
+  batch: 16
+  patience: 10
+  optimizer: AdamW
+  lr0: 0.001
+  cos_lr: true
+  workers: 8
+  mosaic: 1.0
+  close_mosaic: 10
+  mixup: 0.1
+  fliplr: 0.5
+  flipud: 0.0
+  hsv_h: 0.015
+  hsv_s: 0.5
+  hsv_v: 0.4
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5
+  erasing: 0.0
+  plots: true
+eval:
+  splits:
+  - cis_val
+  - trans_val
+  - cis_test
+  - trans_test
+  select_split: cis_val
+  conf: 0.001
+  iou: 0.6
+  deploy_conf: 0.35
+  batch: 16
+  plots: true
+ablation:
+  reference: B_yolov8s
+  experiments:
+  - name: B_yolov8s
+    set: []
+  - name: C_sin_vacias
+    set:
+    - sampling.empty_ratio_train=0.0
+  extra_experiments:
+  - name: A_yolov8n
+    set:
+    - train.model=yolov8n.pt
+  - name: D_con_rfs
+    set:
+    - sampling.repeat_factor_sampling=true
+  - name: E_sin_mosaico
+    set:
+    - train.mosaic=0.0
+    - train.mixup=0.0
+  - name: F_img1024
+    set:
+    - train.imgsz=1024
+    - train.batch=4
+robustness:
+  splits:
+  - cis_test
+  - trans_test
+  size_bins:
+  - 0.0
+  - 0.01
+  - 0.1
+  - 1.01
+  size_names:
+  - pequeño
+  - mediano
+  - grande
+  occ_bins:
+  - 0.15
+  - 0.5
+  manual_occlusion_csv: C:/Users/USUARIO/Desktop/DEVELOPER_FOLDER/REDESNEURONALES/parcial-mia203/p3_fauna/reports/tablas/oclusion_manual.csv
+  max_images: 3000
+background:
+  layers:
+  - 9
+  - 15
+  n_images: 400
+  n_figures: 12
+  mask_blur_sigma: 25
+monitor:
+  split: trans_test
+  camera: null
+  independence_minutes: 30
+  period: D
+_machine_paths:
+  data_root: C:/Users/USUARIO/MIA203/data
+  runs_root: C:/Users/USUARIO/MIA203/runs
+_config_path: C:\Users\USUARIO\Desktop\DEVELOPER_FOLDER\REDESNEURONALES\parcial-mia203\p3_fauna\config.yaml
