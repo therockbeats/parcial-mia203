@@ -35,8 +35,11 @@ class BasicBlock(nn.Module):
             self.shortcut = nn.Sequential(nn.Conv2d(cin, cout, 1, stride=stride, bias=False), nn.BatchNorm2d(cout))
 
     def forward(self, x):
+        # Primera convolución + BatchNorm + activación ReLU
         out = F.relu(self.bn1(self.conv1(x)))
+        # Segunda convolución + BatchNorm
         out = self.bn2(self.conv2(out))
+        # Conexión residual (skip connection)
         return F.relu(out + self.shortcut(x))
 
 
@@ -54,6 +57,10 @@ class ScratchResNet(nn.Module):
                                   nn.BatchNorm2d(c0), nn.ReLU(inplace=True),
                                   nn.MaxPool2d(3, stride=2, padding=1))
         layers, cin = [], c0
+
+        # Construcción de las etapas residuales.
+        # A partir de la segunda etapa se reduce la resolución espacial
+        # mediante stride=2 y se incrementa el número de canales.
         for i, c in enumerate(channels):
             stride = 1 if i == 0 else 2
             layers += [BasicBlock(cin, c, stride), BasicBlock(c, c, 1)]
@@ -69,7 +76,7 @@ class ScratchResNet(nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# Codificadores preentrenados (torchvision)
+# ----Codificadores preentrenados (torchvision)
 # ---------------------------------------------------------------------------
 class TorchvisionEncoder(nn.Module):
     """Parte convolucional de un modelo de torchvision, sin la capa de clasificación."""
@@ -128,14 +135,21 @@ class KneeNet(nn.Module):
         super().__init__()
         self.encoder = encoder
         self.pooling = pooling
-        d = encoder.out_dim
-        self.attn = AttentionPooling(d) if pooling == "attention" else None
+        feature_dim = encoder.out_dim
+        self.attn = AttentionPooling(feature_dim) if pooling == "attention" else None
         self.drop = nn.Dropout(dropout)
-        self.head = nn.Linear(d, n_labels)
+        self.head = nn.Linear(feature_dim, n_labels)
 
     def forward(self, x, return_attention: bool = False):
+        # B = tamaño del lote
+        # S = número de cortes MRI por estudio
         B, S = x.shape[:2]
-        fmap = self.encoder.forward_features(x.flatten(0, 1))     # (B*S, C, h, w)
+
+        # Extracción de características mediante el encoder
+        fmap = self.encoder.forward_features(x.flatten(0, 1))
+        
+        # Conversión de mapas de características a vectores
+        # mediante Global Average Pooling
         feats = fmap.mean(dim=(2, 3)).view(B, S, -1)              # (B, S, C)
         if self.pooling == "attention":
             study, att = self.attn(feats)

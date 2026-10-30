@@ -12,6 +12,9 @@ import pandas as pd
 from sklearn.metrics import average_precision_score, f1_score, precision_score, recall_score, roc_auc_score
 
 
+# Calcula el AUC-ROC únicamente cuando existen
+# ejemplos positivos y negativos en la muestra.
+
 def safe_auc(y, p) -> float:
     """AUC-ROC; NaN si solo hay una clase."""
     return float(roc_auc_score(y, p)) if len(np.unique(y)) == 2 else float("nan")
