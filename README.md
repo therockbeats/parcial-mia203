@@ -258,9 +258,9 @@ efectiva junto a sus resultados.
 | Nombre | Código | Responsabilidad principal |
 |---|---|---|
 | Jose Miguel Alvarado Moreno | 20266834E | P1: pipeline de datos, arquitectura 2.5D y entrenamiento en GPU. P2: pipeline de Sen1Floods11 y de la región de Lima, U-Net y experimentos |
-| (completar) | | |
-| (completar) | | |
-| (completar) | | |
+| Dina Yesica Huamán Huallpa | | Documentación, revisión y mejora de la legibilidad del código Python en los módulos models.py, metrics.py y dataio.py, mediante la incorporación de comentarios explicativos y la revisión de la estructura de los pipelines de procesamiento y clasificación. |
+| Frank Huaman Cancho | | Revisión, documentación y mejora de los informes técnicos, revisión del código Python y evaluación de la estructura y organización de los pipelines implementados. |
+| Cristopher Nunez | | Documentación y revisión del código Python utilizado en los diferentes módulos y experimentos desarrollados. |
 | Jose Gabriel Laymito Quispe |20266942B| Planteamiento y documentación del informe|
 
 ---
