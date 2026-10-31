@@ -8,9 +8,9 @@ preguntas del examen parcial.
 
 | Pregunta | Tarea | Arquitectura | Datos | Carpeta | Estado |
 |---|---|---|---|---|---|
-| P1 | Clasificación multietiqueta de 12 hallazgos en resonancia magnética de rodilla con supervisión débil | CNN 2.5D con agregación por atención: encoder propio y ResNet-50 preentrenada | RSNA Knee Abnormality Detection (Kaggle) | `p1_rodilla/` | experimentos completados |
-| P2 | Segmentación de inundaciones en radar Sentinel-1 y generalización a Lima 2017 | U-Net propia (salto estándar, con atención o sin salto) | Sen1Floods11 + Sentinel-1 Lima 2017 + Copernicus EMSN038 | `p2_inundaciones/` | en desarrollo |
-| P3 | Detección de fauna en cámaras trampa, generalización a cámaras nuevas y monitoreo ecológico | YOLOv8 (Ultralytics) con ajuste fino desde COCO | Caltech Camera Traps, subconjunto CCT-20 (LILA BC) | `p3_fauna/` | pipeline implementado; experimentos pendientes |
+| P1 | Clasificación multietiqueta de 12 hallazgos en resonancia magnética de rodilla con supervisión débil | CNN 2.5D con agregación por atención: encoder propio y ResNet-50 preentrenada | RSNA Knee Abnormality Detection (Kaggle) | `p1_rodilla/` | finalizado |
+| P2 | Segmentación de inundaciones en radar Sentinel-1 y generalización a Lima 2017 | U-Net propia (salto estándar, con atención o sin salto) | Sen1Floods11 + Sentinel-1 Lima 2017 + Copernicus EMSN038 | `p2_inundaciones/` | finalizado |
+| P3 | Detección de fauna en cámaras trampa, generalización a cámaras nuevas y monitoreo ecológico | YOLOv8 (Ultralytics) con ajuste fino desde COCO | Caltech Camera Traps, subconjunto CCT-20 (LILA BC) | `p3_fauna/` | finalizado |
 
 ---
 
@@ -23,7 +23,7 @@ daño de menisco medial y lateral, osteoartrosis medial, lateral y patelofemoral
 articular, sinovitis, quiste de Baker, contusión ósea y fractura. El conjunto contiene 4,407
 estudios (24,371 series, 819,635 imágenes DICOM, 530.6 GB) de 16 centros; solo 58 estudios
 tienen etiquetas de radiólogo, mientras que todos tienen su reporte en texto libre en
-aproximadamente doce idiomas.
+nueve idiomas.
 
 ### Pipeline
 
@@ -255,13 +255,13 @@ efectiva junto a sus resultados.
 
 ## Integrantes
 
-| Nombre | Código | Responsabilidad principal |
+| Nombre | Código | Contribución |
 |---|---|---|
-| Jose Miguel Alvarado Moreno | 20266834E | P1: pipeline de datos, arquitectura 2.5D y entrenamiento en GPU. P2: pipeline de Sen1Floods11 y de la región de Lima, U-Net y experimentos |
-| (completar) | | |
-| (completar) | | |
-| (completar) | | |
-| Jose Gabriel Laymito Quispe |20266942B| Planteamiento y documentación del informe|
+| Jose Miguel Alvarado Moreno | 20266834E | Desarrollo e implementación de los pipelines de datos, incluyendo Sen1Floods11 y la región de Lima; diseño e implementación de las arquitecturas 2.5D y U-Net, ejecución de experimentos y entrenamiento de modelos mediante GPU. |
+| Dina Yesica Huamán Huallpa | | Documentación, revisión y mejora de la legibilidad del código Python en los módulos models.py, metrics.py y data_io.py, mediante la incorporación de comentarios explicativos y la revisión de la estructura de los pipelines de procesamiento y clasificación. |
+| Frank Huaman Cancho | | Revisión, documentación y mejora de los informes técnicos, revisión del código Python y evaluación de la estructura y organización de los pipelines implementados. |
+| Christopher Nunez | | Documentación y revisión del código Python utilizado en los diferentes módulos y experimentos desarrollados. |
+| Jose Gabriel Laymito Quispe | 20266942B | Planteamiento, estructuración y elaboración de la documentación de los informes técnicos. |
 
 ---
 
