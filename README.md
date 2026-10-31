@@ -261,7 +261,7 @@ efectiva junto a sus resultados.
 | (completar) | | |
 | (completar) | | |
 | (completar) | | |
-| (completar) | | |
+| Jose Gabriel Laymito Quispe |20266942B| Planteamiento y documentación del informe|
 
 ---
 
